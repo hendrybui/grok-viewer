@@ -5,6 +5,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' file:;">
   <title>Grok Imagine Viewer</title>
   <link rel="stylesheet" href="../../assets/style.css">
+  <link rel="stylesheet" href="../../assets/enhanced-features.css">
 </head>
 <body>
   <div class="app-container">
@@ -19,11 +20,57 @@
       </div>
     </header>
     
-    <div class="controls-bar" id="controlsBar" style="display: none;">
+    <!-- Sidebar with folder tree -->
+    <div class="main-layout">
+      <aside class="sidebar" id="sidebar" style="display: none;">
+        <div class="sidebar-header">
+          <h3>Folders</h3>
+          <button class="toggle-sidebar" id="toggleSidebar" title="Toggle Sidebar">◀</button>
+        </div>
+        <div class="folder-summary" id="folderSummary" style="display: none;">
+          <div class="summary-item">
+            <span class="summary-icon">🖼️</span>
+            <span class="summary-label">Images:</span>
+            <span class="summary-value" id="totalImages">0</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-icon">🎬</span>
+            <span class="summary-label">Videos:</span>
+            <span class="summary-value" id="totalVideos">0</span>
+          </div>
+          <div class="summary-item total">
+            <span class="summary-icon">📁</span>
+            <span class="summary-label">Total:</span>
+            <span class="summary-value" id="totalFiles">0</span>
+          </div>
+        </div>
+        <div class="folder-tree" id="folderTree">
+          <p class="placeholder-text">No folder selected</p>
+        </div>
+      </aside>
+      
+      <main class="content-area">
+        <div class="controls-bar" id="controlsBar" style="display: none;">
+      <div class="search-controls">
+        <input type="text" id="searchInput" placeholder="🔍 Search files..." class="search-input">
+        <button class="control-btn" id="clearSearchBtn" title="Clear Search" style="display: none;">✕</button>
+      </div>
       <div class="view-controls">
         <button class="control-btn" id="gridViewBtn" title="Grid View">⊞</button>
         <button class="control-btn" id="listViewBtn" title="List View">☰</button>
+        <button class="control-btn" id="detailViewBtn" title="Detail View">▤</button>
         <button class="control-btn" id="flexViewBtn" title="Flexbox View">⊡</button>
+        <button class="control-btn" id="compareViewBtn" title="Compare View">⚏</button>
+      </div>
+      <div class="bulk-controls" style="display: none;">
+        <button class="control-btn" id="selectAllBtn" title="Select All">☑</button>
+        <button class="control-btn" id="deselectAllBtn" title="Deselect All">☐</button>
+        <button class="control-btn" id="bulkDeleteBtn" title="Delete Selected">🗑️</button>
+        <button class="control-btn" id="bulkMoveBtn" title="Move Selected">📁</button>
+        <span id="selectionCount" class="selection-count">0 selected</span>
+      </div>
+      <div class="slideshow-controls">
+        <button class="control-btn" id="slideshowBtn" title="Start Slideshow">▶</button>
       </div>
       <div class="sort-controls">
         <select id="sortSelect">
@@ -43,8 +90,10 @@
       </div>
     </div>
     
-    <div id="gallery" class="gallery">
-      <p class="placeholder-text">Select a folder to begin viewing or use File → Open Folder (Ctrl+O)</p>
+        <div id="gallery" class="gallery">
+          <p class="placeholder-text">Select a folder to begin viewing or use File → Open Folder (Ctrl+O)</p>
+        </div>
+      </main>
     </div>
     
     <div id="viewerModal" class="modal">
@@ -125,6 +174,146 @@
     </div>
   </div>
 
-  <script src="renderer.js"></script>
+  <!-- Slideshow Modal -->
+  <div id="slideshowModal" class="modal slideshow-modal">
+    <div class="slideshow-container">
+      <div class="slideshow-controls-overlay">
+        <button class="slideshow-btn" id="slideshowPrev" title="Previous (←)">‹</button>
+        <button class="slideshow-btn" id="slideshowPlayPause" title="Pause (Space)">⏸</button>
+        <button class="slideshow-btn" id="slideshowNext" title="Next (→)">›</button>
+        <button class="slideshow-btn" id="slideshowSpeedDown" title="Slower">-</button>
+        <span class="slideshow-speed" id="slideshowSpeed">3s</span>
+        <button class="slideshow-btn" id="slideshowSpeedUp" title="Faster">+</button>
+        <button class="slideshow-btn" id="slideshowExit" title="Exit (Esc)">✕</button>
+      </div>
+      <div id="slideshowContent" class="slideshow-content"></div>
+      <div class="slideshow-progress" id="slideshowProgress"></div>
+    </div>
+  </div>
+
+  <!-- Comparison Modal -->
+  <div id="comparisonModal" class="modal comparison-modal">
+    <span class="close-btn" id="closeComparison">&times;</span>
+    <div class="comparison-container">
+      <div class="comparison-panel">
+        <div id="compareImageA" class="compare-image-container">
+          <p class="placeholder-text">Select first image</p>
+        </div>
+        <div class="compare-info" id="compareInfoA"></div>
+      </div>
+      <div class="comparison-divider"></div>
+      <div class="comparison-panel">
+        <div id="compareImageB" class="compare-image-container">
+          <p class="placeholder-text">Select second image</p>
+        </div>
+        <div class="compare-info" id="compareInfoB"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk Move Dialog -->
+  <div id="bulkMoveModal" class="modal">
+    <div class="rename-dialog">
+      <h3>Move Selected Files</h3>
+      <p id="bulkMoveCount">0 files selected</p>
+      <button id="bulkMoveSelect" class="btn-primary">Choose Destination Folder</button>
+      <div class="rename-buttons">
+        <button id="bulkMoveConfirm" class="btn-primary" disabled>Move</button>
+        <button id="bulkMoveCancel" class="btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Keyboard Shortcuts Overlay -->
+  <div id="keyboardHelp" class="keyboard-help" style="display: none;">
+    <div class="keyboard-help-content">
+      <h3>Keyboard Shortcuts</h3>
+      <div class="shortcuts-grid">
+        <div class="shortcut-item"><kbd>Ctrl+O</kbd><span>Open Folder</span></div>
+        <div class="shortcut-item"><kbd>Space</kbd><span>Quick View</span></div>
+        <div class="shortcut-item"><kbd>←/→</kbd><span>Navigate Images</span></div>
+        <div class="shortcut-item"><kbd>Ctrl+A</kbd><span>Select All</span></div>
+        <div class="shortcut-item"><kbd>Ctrl+C</kbd><span>Copy</span></div>
+        <div class="shortcut-item"><kbd>Ctrl+X</kbd><span>Cut</span></div>
+        <div class="shortcut-item"><kbd>Ctrl+V</kbd><span>Paste</span></div>
+        <div class="shortcut-item"><kbd>Del</kbd><span>Delete</span></div>
+        <div class="shortcut-item"><kbd>F11</kbd><span>Start Slideshow</span></div>
+        <div class="shortcut-item"><kbd>Ctrl+F</kbd><span>Search</span></div>
+        <div class="shortcut-item"><kbd>R</kbd><span>Rotate 90°</span></div>
+        <div class="shortcut-item"><kbd>?</kbd><span>Show This Help</span></div>
+      </div>
+      <button class="btn-primary" onclick="document.getElementById('keyboardHelp').style.display='none'">Close</button>
+    </div>
+  </div>
+
+  <!-- Context Menu -->
+  <div id="contextMenu" class="context-menu" style="display: none;">
+    <div class="context-menu-item" data-action="copy">
+      <span class="context-icon">📋</span>
+      <span>Copy</span>
+      <span class="context-shortcut">Ctrl+C</span>
+    </div>
+    <div class="context-menu-item" data-action="cut">
+      <span class="context-icon">✂️</span>
+      <span>Cut</span>
+      <span class="context-shortcut">Ctrl+X</span>
+    </div>
+    <div class="context-menu-item" data-action="paste">
+      <span class="context-icon">📄</span>
+      <span>Paste</span>
+      <span class="context-shortcut">Ctrl+V</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" data-action="edit">
+      <span class="context-icon">✏️</span>
+      <span>Edit with Default App</span>
+    </div>
+    <div class="context-menu-item" data-action="showInFolder">
+      <span class="context-icon">📂</span>
+      <span>Show in Explorer</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" data-action="copyPath">
+      <span class="context-icon">🔗</span>
+      <span>Copy Path</span>
+    </div>
+    <div class="context-menu-item" data-action="properties">
+      <span class="context-icon">ℹ️</span>
+      <span>Properties</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" data-action="rotate90">
+      <span class="context-icon">↻</span>
+      <span>Rotate 90° CW</span>
+      <span class="context-shortcut">R</span>
+    </div>
+    <div class="context-menu-item" data-action="rotate270">
+      <span class="context-icon">↺</span>
+      <span>Rotate 90° CCW</span>
+      <span class="context-shortcut">Shift+R</span>
+    </div>
+    <div class="context-menu-item" data-action="flipH">
+      <span class="context-icon">⇄</span>
+      <span>Flip Horizontal</span>
+    </div>
+    <div class="context-menu-item" data-action="flipV">
+      <span class="context-icon">⇅</span>
+      <span>Flip Vertical</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" data-action="addToCollection">
+      <span class="context-icon">⭐</span>
+      <span>Add to Collection</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item danger" data-action="delete">
+      <span class="context-icon">🗑️</span>
+      <span>Delete</span>
+      <span class="context-shortcut">Del</span>
+    </div>
+  </div>
+
+  <script src="./enhanced-features.js"></script>
+  <script src="./renderer.js"></script>
 </body>
 </html>

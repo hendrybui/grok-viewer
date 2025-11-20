@@ -1,9 +1,17 @@
 // renderer.js - Enhanced with settings support
+console.log('Renderer.js loaded successfully');
+
 let currentFiles = [];
 let currentSettings = {};
+let currentRootPath = null;
+let currentFolderPath = null;
+let folderTreeData = null;
 
 // DOM Elements
 const pickFolderBtn = document.getElementById('pickFolder');
+const sidebar = document.getElementById('sidebar');
+const folderTree = document.getElementById('folderTree');
+const toggleSidebarBtn = document.getElementById('toggleSidebar');
 const gallery = document.getElementById('gallery');
 const modal = document.getElementById('viewerModal');
 const viewerContent = document.getElementById('viewerContent');
@@ -16,9 +24,277 @@ const renameModal = document.getElementById('renameModal');
 const renameInput = document.getElementById('renameInput');
 const renameConfirm = document.getElementById('renameConfirm');
 const renameCancel = document.getElementById('renameCancel');
+const contextMenu = document.getElementById('contextMenu');
 
 let renameTargetPath = null;
 let renameTargetElement = null;
+let contextMenuTargetPath = null;
+
+// Check if context menu element exists
+if (!contextMenu) {
+  console.error('Context menu element not found! Make sure the HTML has an element with id="contextMenu"');
+} else {
+  console.log('Context menu element found successfully');
+}
+
+// Context Menu Functions
+function showContextMenu(x, y, filePath) {
+  if (!contextMenu) {
+    console.error('Cannot show context menu: element not found');
+    return;
+  }
+  
+  contextMenuTargetPath = filePath;
+  contextMenu.style.display = 'block';
+  contextMenu.style.left = `${x}px`;
+  contextMenu.style.top = `${y}px`;
+  
+  // Adjust position if menu goes off screen
+  const rect = contextMenu.getBoundingClientRect();
+  if (rect.right > window.innerWidth) {
+    contextMenu.style.left = `${window.innerWidth - rect.width - 10}px`;
+  }
+  if (rect.bottom > window.innerHeight) {
+    contextMenu.style.top = `${window.innerHeight - rect.height - 10}px`;
+  }
+}
+
+function hideContextMenu() {
+  if (contextMenu) {
+    contextMenu.style.display = 'none';
+  }
+  contextMenuTargetPath = null;
+}
+
+// Handle context menu actions
+if (contextMenu) {
+  contextMenu.addEventListener('click', async (e) => {
+    const item = e.target.closest('.context-menu-item');
+    if (!item || item.classList.contains('disabled')) return;
+    
+    const action = item.dataset.action;
+    
+    if (!contextMenuTargetPath) return;
+    
+    // Store the target path before hiding menu (which clears it)
+    const targetPath = contextMenuTargetPath;
+    hideContextMenu();
+    
+    try {
+      switch (action) {
+        case 'copy':
+          const copyResult = await window.api.copyFile(targetPath);
+          if (copyResult.success) showToast(copyResult.message);
+          break;
+          
+        case 'cut':
+          const cutResult = await window.api.cutFile(targetPath);
+          if (cutResult.success) showToast(cutResult.message);
+          break;
+          
+        case 'paste':
+          const pasteDir = currentFolderPath || currentRootPath;
+          const pasteResult = await window.api.pasteFile(pasteDir);
+          if (pasteResult.success) {
+            showToast(pasteResult.message);
+            await loadFolder(currentRootPath, false);
+          }
+          break;
+          
+        case 'edit':
+          await window.api.editFile(targetPath);
+          break;
+          
+        case 'showInFolder':
+          await window.api.showInFolder(targetPath);
+          break;
+          
+        case 'copyPath':
+          const pathResult = await window.api.copyPath(targetPath);
+          if (pathResult.success) showToast(pathResult.message);
+          break;
+          
+        case 'properties':
+          const propsResult = await window.api.getFileProperties(targetPath);
+          if (propsResult.success) {
+            showFileProperties(propsResult.properties);
+          }
+          break;
+          
+        case 'delete':
+          if (confirm('Are you sure you want to delete this file?')) {
+            const deleteResult = await window.api.deleteFile(targetPath);
+            if (deleteResult.success) {
+              showToast('File deleted');
+              await loadFolder(currentRootPath, false);
+            }
+          }
+          break;
+          
+        case 'rotate90':
+          const rotate90Result = await window.api.rotateImage(targetPath, 90);
+          if (rotate90Result.success) {
+            showToast('Image rotated 90° CW');
+            await loadFolder(currentRootPath, false);
+          }
+          break;
+          
+        case 'rotate270':
+          const rotate270Result = await window.api.rotateImage(targetPath, 270);
+          if (rotate270Result.success) {
+            showToast('Image rotated 90° CCW');
+            await loadFolder(currentRootPath, false);
+          }
+          break;
+          
+        case 'flipH':
+          const flipHResult = await window.api.flipImage(targetPath, 'horizontal');
+          if (flipHResult.success) {
+            showToast('Image flipped horizontally');
+            await loadFolder(currentRootPath, false);
+          }
+          break;
+          
+        case 'flipV':
+          const flipVResult = await window.api.flipImage(targetPath, 'vertical');
+          if (flipVResult.success) {
+            showToast('Image flipped vertically');
+            await loadFolder(currentRootPath, false);
+          }
+          break;
+          
+        case 'addToCollection':
+          if (window.enhancedFeatures) {
+            window.enhancedFeatures.addToCollection(targetPath);
+          }
+          break;
+      }
+    } catch (err) {
+      showToast('Action failed: ' + err.message, true);
+    }
+  });
+}
+
+// Close context menu when clicking outside
+document.addEventListener('click', (e) => {
+  if (contextMenu && !contextMenu.contains(e.target)) {
+    hideContextMenu();
+  }
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', async (e) => {
+  if (!contextMenuTargetPath && currentFiles.length === 0) return;
+  
+  if (e.ctrlKey && e.key === 'c' && contextMenuTargetPath) {
+    e.preventDefault();
+    const result = await window.api.copyFile(contextMenuTargetPath);
+    if (result.success) showToast(result.message);
+  }
+  
+  if (e.ctrlKey && e.key === 'x' && contextMenuTargetPath) {
+    e.preventDefault();
+    const result = await window.api.cutFile(contextMenuTargetPath);
+    if (result.success) showToast(result.message);
+  }
+  
+  if (e.ctrlKey && e.key === 'v') {
+    e.preventDefault();
+    const pasteDir = currentFolderPath || currentRootPath;
+    const result = await window.api.pasteFile(pasteDir);
+    if (result.success) {
+      showToast(result.message);
+      await loadFolder(currentRootPath, false);
+    }
+  }
+  
+  if (e.key === 'Delete' && contextMenuTargetPath) {
+    e.preventDefault();
+    if (confirm('Are you sure you want to delete this file?')) {
+      const result = await window.api.deleteFile(contextMenuTargetPath);
+      if (result.success) {
+        showToast('File deleted');
+        await loadFolder(currentRootPath, false);
+      }
+    }
+  }
+  
+  // Ctrl+B to toggle sidebar
+  if (e.ctrlKey && e.key === 'b') {
+    e.preventDefault();
+    if (sidebar.style.display === 'none') {
+      sidebar.style.display = 'flex';
+    }
+    sidebar.classList.toggle('collapsed');
+    toggleSidebarBtn.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+    showToast(sidebar.classList.contains('collapsed') ? 'Sidebar hidden' : 'Sidebar shown');
+  }
+});
+
+function createMetadataItem(label, value) {
+  const item = document.createElement('div');
+  item.className = 'metadata-item';
+  
+  const labelSpan = document.createElement('span');
+  labelSpan.className = 'metadata-label';
+  labelSpan.textContent = label + ':';
+  
+  const valueSpan = document.createElement('span');
+  valueSpan.className = 'metadata-value';
+  valueSpan.textContent = value;
+  valueSpan.title = value;
+  
+  item.appendChild(labelSpan);
+  item.appendChild(valueSpan);
+  
+  return item;
+}
+
+function showFileProperties(props) {
+  const message = `
+Name: ${props.name}
+Path: ${props.path}
+Size: ${props.sizeFormatted}
+Created: ${new Date(props.created).toLocaleString()}
+Modified: ${new Date(props.modified).toLocaleString()}
+  `.trim();
+  alert(message);
+}
+
+function createMetadataItem(label, value) {
+  const item = document.createElement('div');
+  item.className = 'metadata-item';
+  
+  const labelSpan = document.createElement('span');
+  labelSpan.className = 'metadata-label';
+  labelSpan.textContent = label + ':';
+  
+  const valueSpan = document.createElement('span');
+  valueSpan.className = 'metadata-value';
+  valueSpan.textContent = value;
+  valueSpan.title = value;
+  
+  item.appendChild(labelSpan);
+  item.appendChild(valueSpan);
+  
+  return item;
+}
+
+function showToast(message, isError = false) {
+  let toast = document.querySelector('.toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.className = 'toast';
+    document.body.appendChild(toast);
+  }
+  
+  toast.textContent = message;
+  toast.className = `toast ${isError ? 'toast-error' : ''} show`;
+  
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 3000);
+}
 
 // Initialize settings
 async function initSettings() {
@@ -115,6 +391,12 @@ document.getElementById('listViewBtn').addEventListener('click', async () => {
   renderGallery(currentFiles);
 });
 
+document.getElementById('detailViewBtn').addEventListener('click', async () => {
+  await window.api.setSetting('defaultView', 'detail');
+  currentSettings.defaultView = 'detail';
+  renderGallery(currentFiles);
+});
+
 document.getElementById('flexViewBtn').addEventListener('click', async () => {
   await window.api.setSetting('defaultView', 'flex');
   currentSettings.defaultView = 'flex';
@@ -142,12 +424,144 @@ document.getElementById('sortOrderBtn').addEventListener('click', async () => {
   renderGallery(currentFiles);
 });
 
+// Toggle sidebar
+toggleSidebarBtn.addEventListener('click', () => {
+  sidebar.classList.toggle('collapsed');
+  toggleSidebarBtn.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+  updateFloatingToggle();
+});
+
+// Create floating toggle button for when sidebar is collapsed
+const floatingToggle = document.createElement('button');
+floatingToggle.id = 'floatingToggle';
+floatingToggle.className = 'floating-sidebar-toggle';
+floatingToggle.innerHTML = '▶';
+floatingToggle.title = 'Show Sidebar (Ctrl+B)';
+floatingToggle.style.display = 'none';
+floatingToggle.addEventListener('click', () => {
+  sidebar.classList.remove('collapsed');
+  toggleSidebarBtn.textContent = '◀';
+  updateFloatingToggle();
+});
+document.body.appendChild(floatingToggle);
+
+// Update floating toggle visibility
+function updateFloatingToggle() {
+  if (sidebar.style.display !== 'none' && sidebar.classList.contains('collapsed')) {
+    floatingToggle.style.display = 'flex';
+  } else {
+    floatingToggle.style.display = 'none';
+  }
+}
+
+// Initial check
+updateFloatingToggle();
+
 // Load folder
-async function loadFolder(folderPath) {
+async function loadFolder(folderPath, updateTree = true) {
+  currentRootPath = folderPath;
+  currentFolderPath = folderPath;
+  
+  // Show sidebar and load folder tree
+  sidebar.style.display = 'flex';
+  updateFloatingToggle();
+  
+  if (updateTree) {
+    folderTreeData = await window.api.getFolderTree(folderPath);
+    renderFolderTree(folderTreeData);
+  }
+  
   const files = await window.api.scanFiles(folderPath);
   currentFiles = files;
   controlsBar.style.display = files.length > 0 ? 'flex' : 'none';
   renderGallery(files);
+}
+
+// Load specific folder from tree
+async function loadFolderFromTree(folderPath) {
+  currentFolderPath = folderPath;
+  const files = await window.api.scanFiles(folderPath);
+  currentFiles = files;
+  controlsBar.style.display = files.length > 0 ? 'flex' : 'none';
+  renderGallery(files);
+  
+  // Update active state in tree
+  document.querySelectorAll('.folder-item').forEach(item => {
+    item.classList.remove('active');
+    if (item.dataset.path === folderPath) {
+      item.classList.add('active');
+    }
+  });
+}
+
+// Render folder tree
+function renderFolderTree(folderData) {
+  if (!folderData) {
+    folderTree.innerHTML = '<p class="placeholder-text">Error loading folders</p>';
+    return;
+  }
+  
+  // Update summary
+  const folderSummary = document.getElementById('folderSummary');
+  folderSummary.style.display = 'flex';
+  document.getElementById('totalImages').textContent = folderData.totalImageCount || 0;
+  document.getElementById('totalVideos').textContent = folderData.totalVideoCount || 0;
+  document.getElementById('totalFiles').textContent = (folderData.totalImageCount || 0) + (folderData.totalVideoCount || 0);
+  
+  folderTree.innerHTML = '';
+  
+  function createFolderElement(folder, isRoot = false) {
+    const folderItem = document.createElement('div');
+    folderItem.className = `folder-item ${isRoot ? 'root' : ''} ${folder.path === currentFolderPath ? 'active' : ''}`;
+    folderItem.dataset.path = folder.path;
+    
+    const totalImages = folder.totalImageCount || 0;
+    const totalVideos = folder.totalVideoCount || 0;
+    const hasFiles = totalImages > 0 || totalVideos > 0;
+    
+    let countsHTML = '';
+    if (hasFiles) {
+      countsHTML = '<span class="folder-count">';
+      if (totalImages > 0) {
+        countsHTML += `<span class="count-badge images">🖼️ ${totalImages}</span>`;
+      }
+      if (totalVideos > 0) {
+        countsHTML += `<span class="count-badge videos">🎬 ${totalVideos}</span>`;
+      }
+      countsHTML += '</span>';
+    }
+    
+    folderItem.innerHTML = `
+      <span class="folder-icon">📁</span>
+      <span class="folder-name" title="${folder.name}">${folder.name}</span>
+      ${countsHTML}
+    `;
+    
+    folderItem.addEventListener('click', (e) => {
+      e.stopPropagation();
+      loadFolderFromTree(folder.path);
+    });
+    
+    return folderItem;
+  }
+  
+  function renderFolder(folder, container, isRoot = false) {
+    const folderElement = createFolderElement(folder, isRoot);
+    container.appendChild(folderElement);
+    
+    if (folder.children && folder.children.length > 0) {
+      const childrenContainer = document.createElement('div');
+      childrenContainer.className = 'folder-children';
+      
+      folder.children
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .forEach(child => renderFolder(child, childrenContainer));
+      
+      container.appendChild(childrenContainer);
+    }
+  }
+  
+  renderFolder(folderData, folderTree, true);
 }
 
 // Sort files
@@ -220,18 +634,24 @@ function renderGallery(files) {
   if (currentSettings.defaultView === 'flex') {
     gallery.className = `gallery gallery-flex thumbnail-${currentSettings.thumbnailSize}`;
   } else if (currentSettings.defaultView === 'list') {
-    gallery.className = `gallery thumbnail-${currentSettings.thumbnailSize}`;
+    gallery.className = `gallery list-view-mode thumbnail-${currentSettings.thumbnailSize}`;
+  } else if (currentSettings.defaultView === 'detail') {
+    gallery.className = `gallery detail-view-mode`;
   } else {
     gallery.className = `gallery thumbnail-${currentSettings.thumbnailSize}`;
   }
 
-  sortedFiles.forEach(file => {
+  sortedFiles.forEach(async (file, index) => {
     const ext = file.split('.').pop().toLowerCase();
     const isVideo = currentSettings.supportedFormats.videos.some(v => v === `.${ext}`);
+    const fileName = file.split('\\').pop().split('/').pop();
     
     const item = document.createElement('div');
-    const itemClass = currentSettings.defaultView === 'list' ? 'list-view' : 
-                      currentSettings.defaultView === 'flex' ? 'flex-view' : '';
+    let itemClass = '';
+    if (currentSettings.defaultView === 'list') itemClass = 'list-view';
+    else if (currentSettings.defaultView === 'detail') itemClass = 'detail-view';
+    else if (currentSettings.defaultView === 'flex') itemClass = 'flex-view';
+    
     item.className = `gallery-item ${itemClass}`;
     
     const media = isVideo 
@@ -244,25 +664,55 @@ function renderGallery(files) {
     if (isVideo) {
       media.muted = true;
       media.loop = true;
-      media.autoplay = true;
       media.playsInline = true;
+      media.preload = 'metadata';
       
-      // Use Intersection Observer for auto-play when visible
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            media.play().catch(e => console.log('Autoplay prevented:', e));
-          } else {
-            media.pause();
-          }
-        });
-      }, { threshold: 0.5 });
+      // Add error handling
+      media.addEventListener('error', (e) => {
+        console.error('Video preview error:', file, e);
+        // Create a fallback placeholder
+        const placeholder = document.createElement('div');
+        placeholder.className = 'video-placeholder';
+        placeholder.innerHTML = '🎬<br>Video<br>Click to play';
+        placeholder.style.cssText = 'display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); color: white; width: 100%; height: 100%; font-size: 14px; cursor: pointer;';
+        placeholder.addEventListener('click', () => openViewer(file, true));
+        media.replaceWith(placeholder);
+      });
       
-      observer.observe(media);
+      // Load video metadata first
+      media.addEventListener('loadedmetadata', () => {
+        // Use Intersection Observer for auto-play when visible
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              media.play().catch(e => {
+                console.log('Autoplay prevented:', file, e);
+                // Show play overlay on autoplay failure
+                if (!media.parentElement.querySelector('.play-overlay')) {
+                  const overlay = document.createElement('div');
+                  overlay.className = 'play-overlay';
+                  overlay.innerHTML = '▶';
+                  overlay.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); color: white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 18px; pointer-events: none; z-index: 1;';
+                  media.parentElement.appendChild(overlay);
+                }
+              });
+            } else {
+              media.pause();
+            }
+          });
+        }, { threshold: 0.5 });
+        
+        observer.observe(media);
+      });
       
       // Also play on hover for immediate interaction
       if (currentSettings.autoPlayVideos) {
-        media.addEventListener('mouseenter', () => media.play());
+        media.addEventListener('mouseenter', () => {
+          media.play().catch(e => console.log('Hover play prevented:', e));
+          // Remove play overlay on hover
+          const overlay = media.parentElement?.querySelector('.play-overlay');
+          if (overlay) overlay.remove();
+        });
         media.addEventListener('mouseleave', () => {
           // Only pause if not in view
           const rect = media.getBoundingClientRect();
@@ -274,9 +724,116 @@ function renderGallery(files) {
     
     media.addEventListener('click', () => openViewer(file, isVideo));
     
+    // Add right-click context menu
+    item.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      console.log('Right-click detected on file:', file);
+      contextMenuTargetPath = file;
+      showContextMenu(e.clientX, e.clientY, file);
+    });
+    
     item.appendChild(media);
     
-    if (currentSettings.showFileNames) {
+    // List view: Add file info below media
+    if (currentSettings.defaultView === 'list') {
+      const fileNameContainer = document.createElement('div');
+      fileNameContainer.className = 'file-name-container';
+      
+      const fileNameDiv = document.createElement('div');
+      fileNameDiv.className = 'file-name';
+      fileNameDiv.textContent = fileName;
+      fileNameDiv.title = fileName;
+      
+      const fileMeta = document.createElement('div');
+      fileMeta.className = 'file-meta';
+      
+      const typeBadge = document.createElement('span');
+      typeBadge.className = `file-type-badge ${isVideo ? 'video' : 'image'}`;
+      typeBadge.textContent = isVideo ? 'Video' : 'Image';
+      
+      fileMeta.appendChild(typeBadge);
+      
+      // Get file size asynchronously
+      window.api.getFileProperties(file).then(result => {
+        if (result.success && result.properties.sizeFormatted) {
+          const sizeSpan = document.createElement('span');
+          sizeSpan.textContent = result.properties.sizeFormatted;
+          fileMeta.appendChild(sizeSpan);
+        }
+      });
+      
+      fileNameContainer.appendChild(fileNameDiv);
+      fileNameContainer.appendChild(fileMeta);
+      item.appendChild(fileNameContainer);
+    }
+    
+    // Detail view: Add file info section
+    if (currentSettings.defaultView === 'detail') {
+      const fileInfo = document.createElement('div');
+      fileInfo.className = 'file-info';
+      
+      const fileNameDiv = document.createElement('div');
+      fileNameDiv.className = 'file-name';
+      fileNameDiv.textContent = fileName;
+      fileInfo.appendChild(fileNameDiv);
+      
+      // Get file metadata asynchronously
+      window.api.getFileProperties(file).then(result => {
+        if (result.success) {
+          const metadata = document.createElement('div');
+          metadata.className = 'file-metadata';
+          
+          const typeItem = createMetadataItem('Type', isVideo ? 'Video' : 'Image');
+          const sizeItem = createMetadataItem('Size', result.properties.sizeFormatted);
+          const modifiedItem = createMetadataItem('Modified', new Date(result.properties.modified).toLocaleDateString());
+          const pathItem = createMetadataItem('Location', file.substring(0, 60) + (file.length > 60 ? '...' : ''));
+          
+          metadata.appendChild(typeItem);
+          metadata.appendChild(sizeItem);
+          metadata.appendChild(modifiedItem);
+          metadata.appendChild(pathItem);
+          
+          fileInfo.appendChild(metadata);
+        }
+      });
+      
+      // Action buttons for detail view
+      const actionsDiv = document.createElement('div');
+      actionsDiv.className = 'file-actions';
+      
+      const favBtn = document.createElement('button');
+      favBtn.className = 'action-btn fav-btn';
+      favBtn.innerHTML = currentSettings.favorites.includes(file) ? '❤️ Favorite' : '♡ Favorite';
+      favBtn.onclick = (e) => {
+        e.stopPropagation();
+        toggleFavorite(file, favBtn);
+      };
+      
+      const editBtn = document.createElement('button');
+      editBtn.className = 'action-btn';
+      editBtn.innerHTML = '✏️ Edit';
+      editBtn.onclick = (e) => {
+        e.stopPropagation();
+        window.api.editFile(file);
+      };
+      
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'action-btn delete-btn';
+      deleteBtn.innerHTML = '🗑️ Delete';
+      deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        deleteFile(file, item);
+      };
+      
+      actionsDiv.appendChild(favBtn);
+      actionsDiv.appendChild(editBtn);
+      actionsDiv.appendChild(deleteBtn);
+      
+      fileInfo.appendChild(actionsDiv);
+      item.appendChild(fileInfo);
+    }
+    // Standard view (not list or detail): Show file names if enabled
+    else if (currentSettings.showFileNames && currentSettings.defaultView !== 'list') {
       const fileNameContainer = document.createElement('div');
       fileNameContainer.className = 'file-name-container';
       
@@ -356,8 +913,21 @@ async function renameFile(oldPath, newPath, fileNameElement) {
         currentFiles[index] = newPath;
       }
       
-      // Update display
-      fileNameElement.textContent = newPath.split('\\').pop().split('/').pop();
+      // Update favorites if file was favorited
+      const favIndex = currentSettings.favorites.indexOf(oldPath);
+      if (favIndex > -1) {
+        currentSettings.favorites[favIndex] = newPath;
+        await window.api.setSetting('favorites', currentSettings.favorites);
+      }
+      
+      // Update display if element provided
+      if (fileNameElement) {
+        const newFileName = newPath.split('\\').pop().split('/').pop();
+        fileNameElement.textContent = newFileName;
+      }
+      
+      // Reload gallery to show updated file
+      await loadFolder(currentRootPath, false);
       
       // Show success feedback
       showToast('File renamed successfully!');
@@ -484,17 +1054,93 @@ function showCurrentMedia() {
     const videoControls = document.createElement('div');
     videoControls.className = 'video-controls';
     
+    // Create progress bar container
+    const progressBarContainer = document.createElement('div');
+    progressBarContainer.className = 'video-progress-container';
+    
+    const currentTimeDisplay = document.createElement('span');
+    currentTimeDisplay.className = 'time-display';
+    currentTimeDisplay.textContent = '0:00';
+    
+    const progressBar = document.createElement('div');
+    progressBar.className = 'video-progress-bar';
+    const progressFilled = document.createElement('div');
+    progressFilled.className = 'video-progress-filled';
+    progressBar.appendChild(progressFilled);
+    
+    const durationDisplay = document.createElement('span');
+    durationDisplay.className = 'time-display';
+    durationDisplay.textContent = '0:00';
+    
+    // Format time helper
+    const formatTime = (seconds) => {
+      if (isNaN(seconds)) return '0:00';
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+    
+    // Update progress bar
+    media.addEventListener('loadedmetadata', () => {
+      durationDisplay.textContent = formatTime(media.duration);
+    });
+    
+    media.addEventListener('timeupdate', () => {
+      const percent = (media.currentTime / media.duration) * 100 || 0;
+      progressFilled.style.width = `${percent}%`;
+      currentTimeDisplay.textContent = formatTime(media.currentTime);
+    });
+    
+    // Seek functionality
+    progressBar.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const rect = progressBar.getBoundingClientRect();
+      const pos = (e.clientX - rect.left) / rect.width;
+      media.currentTime = pos * media.duration;
+    });
+    
+    // Draggable seek
+    let isSeeking = false;
+    progressBar.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      isSeeking = true;
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+      if (isSeeking) {
+        const rect = progressBar.getBoundingClientRect();
+        const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        media.currentTime = pos * media.duration;
+      }
+    });
+    
+    document.addEventListener('mouseup', () => {
+      isSeeking = false;
+    });
+    
+    progressBarContainer.appendChild(currentTimeDisplay);
+    progressBarContainer.appendChild(progressBar);
+    progressBarContainer.appendChild(durationDisplay);
+    
     const playPauseBtn = document.createElement('button');
     playPauseBtn.className = 'video-control-btn play-pause-btn';
     playPauseBtn.innerHTML = '⏸';
+    
+    // Update play/pause button based on video state
+    media.addEventListener('play', () => {
+      playPauseBtn.innerHTML = '⏸';
+    });
+    
+    media.addEventListener('pause', () => {
+      playPauseBtn.innerHTML = '▶';
+    });
+    
     playPauseBtn.onclick = (e) => {
       e.stopPropagation();
       if (media.paused) {
         media.play();
-        playPauseBtn.innerHTML = '⏸';
       } else {
         media.pause();
-        playPauseBtn.innerHTML = '▶';
       }
     };
     
@@ -593,6 +1239,9 @@ function showCurrentMedia() {
       });
     };
     
+    // Add progress bar first (at top of controls)
+    viewerContent.appendChild(progressBarContainer);
+    
     videoControls.appendChild(playPauseBtn);
     videoControls.appendChild(loopBtn);
     videoControls.appendChild(volumeBtn);
@@ -632,6 +1281,13 @@ function showCurrentMedia() {
   counter.textContent = `${currentViewerIndex + 1} / ${currentFiles.length}`;
   viewerContent.appendChild(counter);
   
+  // Add right-click context menu to viewer media
+  media.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    contextMenuTargetPath = file;
+    showContextMenu(e.clientX, e.clientY, file);
+  });
+  
   viewerContent.appendChild(media);
 }
 
@@ -663,10 +1319,51 @@ modal.addEventListener('click', (e) => {
 // Keyboard navigation
 document.addEventListener('keydown', (e) => {
   if (modal.style.display === 'flex') {
-    if (e.key === 'ArrowLeft') {
-      navigateViewer(-1);
-    } else if (e.key === 'ArrowRight') {
-      navigateViewer(1);
+    // Get current video element if exists
+    const videoElement = viewerContent.querySelector('video');
+    
+    if (e.key === 'ArrowLeft' && !e.shiftKey) {
+      if (videoElement && e.ctrlKey) {
+        // Ctrl+Left: Seek backward 10 seconds
+        e.preventDefault();
+        videoElement.currentTime = Math.max(0, videoElement.currentTime - 10);
+      } else {
+        // Navigate to previous media
+        navigateViewer(-1);
+      }
+    } else if (e.key === 'ArrowRight' && !e.shiftKey) {
+      if (videoElement && e.ctrlKey) {
+        // Ctrl+Right: Seek forward 10 seconds
+        e.preventDefault();
+        videoElement.currentTime = Math.min(videoElement.duration, videoElement.currentTime + 10);
+      } else {
+        // Navigate to next media
+        navigateViewer(1);
+      }
+    } else if (e.key === ' ' || e.key === 'Spacebar') {
+      // Space: Play/pause video
+      if (videoElement) {
+        e.preventDefault();
+        if (videoElement.paused) {
+          videoElement.play();
+        } else {
+          videoElement.pause();
+        }
+      }
+    } else if (e.key === 'ArrowUp' && videoElement) {
+      // Arrow Up: Increase volume
+      e.preventDefault();
+      videoElement.volume = Math.min(1, videoElement.volume + 0.1);
+    } else if (e.key === 'ArrowDown' && videoElement) {
+      // Arrow Down: Decrease volume
+      e.preventDefault();
+      videoElement.volume = Math.max(0, videoElement.volume - 0.1);
+    } else if (e.key === 'm' || e.key === 'M') {
+      // M: Toggle mute
+      if (videoElement) {
+        e.preventDefault();
+        videoElement.muted = !videoElement.muted;
+      }
     } else if (e.key === 'Escape') {
       modal.style.display = 'none';
       viewerContent.innerHTML = '';
@@ -675,7 +1372,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Rename modal handlers
-renameConfirm.addEventListener('click', () => {
+renameConfirm.addEventListener('click', async () => {
   const newName = renameInput.value.trim();
   if (!newName || !renameTargetPath) return;
   
@@ -684,10 +1381,14 @@ renameConfirm.addEventListener('click', () => {
   const ext = currentName.substring(currentName.lastIndexOf('.'));
   
   if (newName !== nameWithoutExt) {
-    const directory = renameTargetPath.substring(0, renameTargetPath.lastIndexOf('\\') || renameTargetPath.lastIndexOf('/'));
-    const newPath = `${directory}${directory.includes('\\') ? '\\' : '/'}${newName}${ext}`;
+    // Determine path separator
+    const separator = renameTargetPath.includes('\\') ? '\\' : '/';
+    const lastSepIndex = renameTargetPath.lastIndexOf(separator);
+    const directory = renameTargetPath.substring(0, lastSepIndex);
+    const newPath = `${directory}${separator}${newName}${ext}`;
     
-    renameFile(renameTargetPath, newPath, renameTargetElement);
+    console.log('Renaming:', renameTargetPath, 'to', newPath);
+    await renameFile(renameTargetPath, newPath, renameTargetElement);
   }
   
   renameModal.style.display = 'none';
@@ -750,3 +1451,12 @@ function applyTheme(color) {
 
 // Initialize on load
 initSettings();
+
+// Initialize enhanced features when available
+if (window.enhancedFeatures) {
+  window.addEventListener('load', () => {
+    window.enhancedFeatures.init();
+    window.enhancedFeatures.setupLazyLoading();
+    window.enhancedFeatures.setupVirtualScrolling();
+  });
+}

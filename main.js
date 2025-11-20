@@ -208,22 +208,44 @@ ipcMain.handle('dialog:openDirectory', async () => {
   }
 });
 
-// 2. Handle scanning the files
+// 2. Handle scanning the files (recursively)
 ipcMain.handle('files:scan', async (event, dirPath) => {
   try {
-    const files = await fs.readdir(dirPath);
     const userSettings = settings.getAll();
     const allExtensions = [
       ...userSettings.supportedFormats.images,
       ...userSettings.supportedFormats.videos
     ];
     
-    // Filter for media files and return full paths
-    const mediaFiles = files
-      .filter(file => allExtensions.includes(path.extname(file).toLowerCase()))
-      .map(file => path.join(dirPath, file));
+    // Recursive function to scan directories
+    async function scanDirectory(directory) {
+      const mediaFiles = [];
       
-    return mediaFiles;
+      try {
+        const entries = await fs.readdir(directory, { withFileTypes: true });
+        
+        for (const entry of entries) {
+          const fullPath = path.join(directory, entry.name);
+          
+          if (entry.isDirectory()) {
+            // Recursively scan subdirectories
+            const subDirFiles = await scanDirectory(fullPath);
+            mediaFiles.push(...subDirFiles);
+          } else if (entry.isFile()) {
+            // Check if file is a supported media file
+            if (allExtensions.includes(path.extname(entry.name).toLowerCase())) {
+              mediaFiles.push(fullPath);
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`Error reading directory ${directory}:`, err);
+      }
+      
+      return mediaFiles;
+    }
+    
+    return await scanDirectory(dirPath);
   } catch (err) {
     console.error('Error reading directory:', err);
     return [];
@@ -266,4 +288,276 @@ ipcMain.handle('file:delete', async (event, filePath) => {
     console.error('Error deleting file:', err);
     return { success: false, error: err.message };
   }
+});
+
+// 8. Handle file operations
+ipcMain.handle('file:copy', async (event, filePath) => {
+  try {
+    const { clipboard, nativeImage } = require('electron');
+    const image = nativeImage.createFromPath(filePath);
+    if (!image.isEmpty()) {
+      clipboard.writeImage(image);
+      return { success: true, message: 'Image copied to clipboard' };
+    } else {
+      // For videos or if image fails, copy file path
+      clipboard.writeText(filePath);
+      return { success: true, message: 'File path copied to clipboard' };
+    }
+  } catch (err) {
+    console.error('Error copying file:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('file:cut', async (event, filePath) => {
+  try {
+    const { clipboard } = require('electron');
+    clipboard.writeText(`cut:${filePath}`);
+    return { success: true, message: 'File cut to clipboard' };
+  } catch (err) {
+    console.error('Error cutting file:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('file:paste', async (event, targetDir) => {
+  try {
+    const { clipboard } = require('electron');
+    const clipText = clipboard.readText();
+    
+    if (clipText.startsWith('cut:')) {
+      const sourcePath = clipText.substring(4);
+      const fileName = path.basename(sourcePath);
+      const targetPath = path.join(targetDir, fileName);
+      
+      await fs.rename(sourcePath, targetPath);
+      return { success: true, message: 'File moved', path: targetPath };
+    }
+    
+    return { success: false, error: 'No file to paste' };
+  } catch (err) {
+    console.error('Error pasting file:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('file:edit', async (event, filePath) => {
+  try {
+    const { shell } = require('electron');
+    await shell.openPath(filePath);
+    return { success: true };
+  } catch (err) {
+    console.error('Error opening file:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('file:showInFolder', async (event, filePath) => {
+  try {
+    const { shell } = require('electron');
+    shell.showItemInFolder(filePath);
+    return { success: true };
+  } catch (err) {
+    console.error('Error showing file in folder:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('file:copyPath', async (event, filePath) => {
+  try {
+    const { clipboard } = require('electron');
+    clipboard.writeText(filePath);
+    return { success: true, message: 'Path copied to clipboard' };
+  } catch (err) {
+    console.error('Error copying path:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('file:getProperties', async (event, filePath) => {
+  try {
+    const stats = await fs.stat(filePath);
+    return {
+      success: true,
+      properties: {
+        name: path.basename(filePath),
+        path: filePath,
+        size: stats.size,
+        sizeFormatted: formatBytes(stats.size),
+        created: stats.birthtime,
+        modified: stats.mtime,
+        isDirectory: stats.isDirectory()
+      }
+    };
+  } catch (err) {
+    console.error('Error getting file properties:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+function formatBytes(bytes, decimals = 2) {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+// 9. Handle getting folder tree structure
+ipcMain.handle('files:getFolderTree', async (event, rootPath) => {
+  try {
+    const userSettings = settings.getAll();
+    const imageExtensions = userSettings.supportedFormats.images;
+    const videoExtensions = userSettings.supportedFormats.videos;
+
+    async function buildTree(dirPath, isRoot = false) {
+      const folder = {
+        name: isRoot ? path.basename(dirPath) : path.basename(dirPath),
+        path: dirPath,
+        children: [],
+        imageCount: 0,
+        videoCount: 0
+      };
+
+      try {
+        const entries = await fs.readdir(dirPath, { withFileTypes: true });
+        
+        // Count media files in this directory
+        for (const entry of entries) {
+          if (entry.isFile()) {
+            const ext = path.extname(entry.name).toLowerCase();
+            if (imageExtensions.includes(ext)) {
+              folder.imageCount++;
+            } else if (videoExtensions.includes(ext)) {
+              folder.videoCount++;
+            }
+          }
+        }
+
+        // Build child folders
+        for (const entry of entries) {
+          if (entry.isDirectory()) {
+            const childPath = path.join(dirPath, entry.name);
+            const childFolder = await buildTree(childPath, false);
+            // Only include folders that have files (directly or in subfolders)
+            const childTotal = childFolder.imageCount + childFolder.videoCount + (childFolder.totalImageCount || 0) + (childFolder.totalVideoCount || 0);
+            if (childTotal > 0) {
+              folder.children.push(childFolder);
+            }
+          }
+        }
+
+        // Calculate total counts including subfolders
+        folder.totalImageCount = folder.imageCount + folder.children.reduce((sum, child) => sum + (child.totalImageCount || 0), 0);
+        folder.totalVideoCount = folder.videoCount + folder.children.reduce((sum, child) => sum + (child.totalVideoCount || 0), 0);
+        
+      } catch (err) {
+        console.error(`Error reading directory ${dirPath}:`, err);
+      }
+
+      return folder;
+    }
+
+    return await buildTree(rootPath, true);
+  } catch (err) {
+    console.error('Error building folder tree:', err);
+    return null;
+  }
+});
+
+// 10. Handle image rotation
+ipcMain.handle('file:rotate', async (event, filePath, angle) => {
+  try {
+    const sharp = require('sharp');
+    const buffer = await fs.readFile(filePath);
+    const rotated = await sharp(buffer)
+      .rotate(angle)
+      .toBuffer();
+    
+    await fs.writeFile(filePath, rotated);
+    return { success: true };
+  } catch (err) {
+    console.error('Error rotating image:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 11. Handle image flip
+ipcMain.handle('file:flip', async (event, filePath, direction) => {
+  try {
+    const sharp = require('sharp');
+    const buffer = await fs.readFile(filePath);
+    let transform = sharp(buffer);
+    
+    if (direction === 'horizontal') {
+      transform = transform.flop();
+    } else if (direction === 'vertical') {
+      transform = transform.flip();
+    }
+    
+    const flipped = await transform.toBuffer();
+    await fs.writeFile(filePath, flipped);
+    return { success: true };
+  } catch (err) {
+    console.error('Error flipping image:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 12. Handle thumbnail generation (for caching)
+ipcMain.handle('file:generateThumbnail', async (event, filePath, size = 300) => {
+  try {
+    const sharp = require('sharp');
+    const buffer = await fs.readFile(filePath);
+    const thumbnail = await sharp(buffer)
+      .resize(size, size, {
+        fit: 'cover',
+        position: 'center'
+      })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+    
+    // Store in cache directory
+    const cacheDir = path.join(app.getPath('userData'), 'thumbnails');
+    await fs.mkdir(cacheDir, { recursive: true });
+    
+    const hash = require('crypto').createHash('md5').update(filePath).digest('hex');
+    const cachePath = path.join(cacheDir, `${hash}.jpg`);
+    
+    await fs.writeFile(cachePath, thumbnail);
+    return { success: true, cachePath };
+  } catch (err) {
+    console.error('Error generating thumbnail:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 13. Handle batch file operations
+ipcMain.handle('files:batchMove', async (event, files, targetDir) => {
+  const results = [];
+  for (const file of files) {
+    try {
+      const fileName = path.basename(file);
+      const targetPath = path.join(targetDir, fileName);
+      await fs.rename(file, targetPath);
+      results.push({ file, success: true });
+    } catch (err) {
+      results.push({ file, success: false, error: err.message });
+    }
+  }
+  return results;
+});
+
+ipcMain.handle('files:batchDelete', async (event, files) => {
+  const results = [];
+  for (const file of files) {
+    try {
+      await fs.unlink(file);
+      results.push({ file, success: true });
+    } catch (err) {
+      results.push({ file, success: false, error: err.message });
+    }
+  }
+  return results;
 });
