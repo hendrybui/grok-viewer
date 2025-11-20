@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' file:;">
+  <title>Grok Imagine Viewer</title>
+  <link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+  <div class="app-container">
+    <header class="header">
+      <div class="title-group">
+        <h1>Grok Gallery</h1>
+        <p>Local Neo Image Viewer</p>
+      </div>
+      <div class="header-controls">
+        <button id="pickFolder">Select Folder</button>
+        <button id="settingsBtn" title="Settings">⚙️</button>
+      </div>
+    </header>
+    
+    <div class="controls-bar" id="controlsBar" style="display: none;">
+      <div class="view-controls">
+        <button class="control-btn" id="gridViewBtn" title="Grid View">⊞</button>
+        <button class="control-btn" id="listViewBtn" title="List View">☰</button>
+        <button class="control-btn" id="flexViewBtn" title="Flexbox View">⊡</button>
+      </div>
+      <div class="sort-controls">
+        <select id="sortSelect">
+          <option value="name">Sort by Name</option>
+          <option value="date">Sort by Date</option>
+          <option value="size">Sort by Size</option>
+          <option value="favorites">Sort by Favorites</option>
+        </select>
+        <button id="sortOrderBtn" class="control-btn" title="Toggle sort order">↕</button>
+      </div>
+      <div class="filter-controls">
+        <select id="filterSelect">
+          <option value="all">All Media</option>
+          <option value="images">Images Only</option>
+          <option value="videos">Videos Only</option>
+        </select>
+      </div>
+    </div>
+    
+    <div id="gallery" class="gallery">
+      <p class="placeholder-text">Select a folder to begin viewing or use File → Open Folder (Ctrl+O)</p>
+    </div>
+    
+    <div id="viewerModal" class="modal">
+      <span class="close-btn">&times;</span>
+      <div class="modal-content" id="viewerContent"></div>
+    </div>
+    
+    <!-- Settings Panel -->
+    <div id="settingsPanel" class="settings-panel">
+      <div class="settings-header">
+        <h2>Settings</h2>
+        <button class="close-settings">×</button>
+      </div>
+      <div class="settings-content">
+        <div class="setting-group">
+          <label>Theme Color:</label>
+          <select id="themeColor">
+            <option value="purple">Purple</option>
+            <option value="blue">Blue</option>
+            <option value="pink">Pink</option>
+            <option value="green">Green</option>
+            <option value="orange">Orange</option>
+            <option value="red">Red</option>
+          </select>
+        </div>
+        <div class="setting-group">
+          <label>
+            <input type="checkbox" id="autoPlayVideos">
+            Auto-play videos on hover
+          </label>
+        </div>
+        <div class="setting-group">
+          <label>
+            <input type="checkbox" id="showFileNames">
+            Show file names
+          </label>
+        </div>
+        <div class="setting-group">
+          <label>Viewer Mode:</label>
+          <select id="viewerMode">
+            <option value="fit">Fit to Screen</option>
+            <option value="fill">Fill Screen</option>
+            <option value="original">Original Size</option>
+          </select>
+        </div>
+        <div class="setting-group">
+          <label>Thumbnail Size:</label>
+          <select id="thumbnailSize">
+            <option value="small">Small</option>
+            <option value="medium">Medium</option>
+            <option value="large">Large</option>
+          </select>
+        </div>
+        <div class="setting-group">
+          <label>Slideshow Interval (seconds):</label>
+          <input type="number" id="slideShowInterval" min="1" max="60" step="1">
+        </div>
+        <button class="reset-btn" id="resetSettings">Reset to Defaults</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Viewer Modal -->
+  <div id="viewerModal" class="modal">
+    <span class="close-btn">&times;</span>
+    <div id="viewerContent"></div>
+  </div>
+
+  <!-- Rename Modal -->
+  <div id="renameModal" class="modal">
+    <div class="rename-dialog">
+      <h3>Rename File</h3>
+      <input type="text" id="renameInput" placeholder="Enter new filename">
+      <div class="rename-buttons">
+        <button id="renameConfirm" class="btn-primary">Rename</button>
+        <button id="renameCancel" class="btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

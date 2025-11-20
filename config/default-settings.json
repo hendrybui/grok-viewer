@@ -1,0 +1,19 @@
+{
+  "theme": "dark",
+  "themeColor": "purple",
+  "defaultView": "grid",
+  "viewerMode": "fit",
+  "thumbnailSize": "medium",
+  "autoPlayVideos": true,
+  "sortBy": "name",
+  "sortOrder": "asc",
+  "filterBy": "all",
+  "supportedFormats": {
+    "images": [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg"],
+    "videos": [".mp4", ".mov", ".webm", ".avi", ".mkv"]
+  },
+  "gridColumns": "auto",
+  "showFileNames": true,
+  "slideShowInterval": 3000,
+  "favorites": []
+}

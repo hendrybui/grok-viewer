@@ -1,0 +1,6 @@
+grok-viewer/
+├── build/
+│   └── icon.ico
+├── package.json
+├── main.js
+...
