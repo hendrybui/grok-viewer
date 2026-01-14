@@ -9,10 +9,9 @@ const SettingsManager = require('./src/main/settings');
 const AppUpdater = require('./src/main/updater');
 const ExifHandler = require('./src/main/exif-handler');
 
-// Suppress GPU cache errors and disable GPU features for compatibility
+// Suppress GPU cache errors for compatibility (GPU enabled for visual effects)
 app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
 app.commandLine.appendSwitch('disable-gpu-program-cache');
-app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('no-sandbox');
 
 const settings = new SettingsManager();
