@@ -6,8 +6,9 @@
   right: 0;
   width: 400px;
   height: 100vh;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  border-left: 2px solid rgba(0, 255, 157, 0.3);
+  background: rgba(10, 10, 10, 0.98);
+  backdrop-filter: blur(20px);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: -5px 0 30px rgba(0, 0, 0, 0.5);
   z-index: 10000;
   display: flex;
@@ -27,15 +28,14 @@
   align-items: center;
   padding: 20px;
   background: rgba(0, 0, 0, 0.3);
-  border-bottom: 1px solid rgba(0, 255, 157, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .exif-header h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #00ff9d;
-  text-shadow: 0 0 10px rgba(0, 255, 157, 0.5);
+  color: white;
 }
 
 .exif-close {
@@ -69,12 +69,12 @@
 }
 
 .exif-content::-webkit-scrollbar-thumb {
-  background: rgba(0, 255, 157, 0.3);
+  background: var(--theme-primary);
   border-radius: 4px;
 }
 
 .exif-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 255, 157, 0.5);
+  background: var(--theme-secondary);
 }
 
 .exif-loading,
@@ -97,10 +97,10 @@
   margin: 0 0 12px 0;
   font-size: 14px;
   font-weight: 600;
-  color: #00d4ff;
+  color: var(--theme-primary);
   text-transform: uppercase;
   letter-spacing: 1px;
-  border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+  border-bottom: 1px solid rgba(102, 126, 234, 0.2);
   padding-bottom: 8px;
 }
 
@@ -144,20 +144,20 @@
 .exif-copy-btn {
   width: 100%;
   padding: 12px;
-  background: linear-gradient(135deg, #00d4ff 0%, #00ff9d 100%);
+  background: linear-gradient(135deg, var(--theme-primary) 0%, var(--theme-secondary) 100%);
   border: none;
   border-radius: 8px;
-  color: #0a0a0a;
+  color: white;
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
   transition: all 0.3s;
-  box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
 }
 
 .exif-copy-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 212, 255, 0.5);
+  box-shadow: 0 6px 20px var(--theme-primary);
 }
 
 .exif-copy-btn:active {
@@ -170,10 +170,10 @@
   top: 70px;
   right: 20px;
   padding: 10px 20px;
-  background: rgba(0, 212, 255, 0.2);
-  border: 1px solid rgba(0, 212, 255, 0.5);
+  background: rgba(102, 126, 234, 0.2);
+  border: 1px solid rgba(102, 126, 234, 0.5);
   border-radius: 8px;
-  color: #00d4ff;
+  color: var(--theme-primary);
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
@@ -183,9 +183,9 @@
 }
 
 .exif-info-btn:hover {
-  background: rgba(0, 212, 255, 0.3);
-  border-color: #00d4ff;
-  box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+  background: var(--theme-primary);
+  border-color: var(--theme-primary);
+  box-shadow: 0 0 20px var(--theme-primary);
 }
 
 /* Responsive for smaller screens */

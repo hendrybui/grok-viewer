@@ -49,8 +49,9 @@
   display: flex;
   gap: 8px;
   align-items: center;
-  padding: 4px 12px;
-  background: rgba(102, 126, 234, 0.2);
+  padding: 6px 12px;
+  background: rgba(96, 165, 250, 0.1);
+  border: 1px solid rgba(96, 165, 250, 0.3);
   border-radius: 8px;
 }
 
@@ -247,6 +248,7 @@
 .comparison-divider {
   background: linear-gradient(to bottom, transparent, var(--theme-primary), transparent);
   width: 2px;
+  box-shadow: 0 0 10px var(--theme-primary);
 }
 
 .compare-info {
@@ -360,8 +362,8 @@ kbd {
   position: absolute;
   top: 8px;
   right: 8px;
-  background: rgba(255, 215, 0, 0.9);
-  color: #000;
+  background: linear-gradient(135deg, var(--theme-primary) 0%, var(--theme-secondary) 100%);
+  color: white;
   padding: 4px 8px;
   border-radius: 12px;
   font-size: 11px;
