@@ -6,6 +6,7 @@ let currentSettings = {};
 let currentRootPath = null;
 let currentFolderPath = null;
 let folderTreeData = null;
+let selectedFiles = new Set(); // Track selected files for multi-select
 
 // DOM Elements
 const pickFolderBtn = document.getElementById('pickFolder');
@@ -35,6 +36,59 @@ if (!contextMenu) {
   console.error('Context menu element not found! Make sure the HTML has an element with id="contextMenu"');
 } else {
   console.log('Context menu element found successfully');
+}
+
+// Multi-select functions
+function toggleFileSelection(filePath, addToSelection = false) {
+  if (selectedFiles.has(filePath)) {
+    selectedFiles.delete(filePath);
+  } else {
+    if (!addToSelection) {
+      selectedFiles.clear();
+    }
+    selectedFiles.add(filePath);
+  }
+  updateSelectionUI();
+}
+
+function clearSelection() {
+  selectedFiles.clear();
+  updateSelectionUI();
+}
+
+function selectAllFiles() {
+  selectedFiles.clear();
+  currentFiles.forEach(file => selectedFiles.add(file));
+  updateSelectionUI();
+}
+
+function updateSelectionUI() {
+  // Update gallery items
+  document.querySelectorAll('.gallery-item').forEach(item => {
+    const filePath = item.dataset.filePath;
+    if (selectedFiles.has(filePath)) {
+      item.classList.add('selected');
+    } else {
+      item.classList.remove('selected');
+    }
+  });
+
+  // Update bulk controls visibility
+  const bulkControls = document.querySelector('.bulk-controls');
+  const selectionCount = document.getElementById('selectionCount');
+  
+  if (bulkControls && selectionCount) {
+    if (selectedFiles.size > 0) {
+      bulkControls.style.display = 'flex';
+      selectionCount.textContent = `${selectedFiles.size} selected`;
+    } else {
+      bulkControls.style.display = 'none';
+    }
+  }
+  
+  // Dispatch selection changed event for face swap button
+  const event = new CustomEvent('selectionChanged');
+  document.dispatchEvent(event);
 }
 
 // Context Menu Functions
@@ -184,6 +238,13 @@ document.addEventListener('click', (e) => {
 
 // Keyboard shortcuts
 document.addEventListener('keydown', async (e) => {
+  // Ctrl+A to select all files
+  if (e.ctrlKey && e.key === 'a' && !e.shiftKey) {
+    e.preventDefault();
+    selectAllFiles();
+    return;
+  }
+  
   if (!contextMenuTargetPath && currentFiles.length === 0) return;
   
   if (e.ctrlKey && e.key === 'c' && contextMenuTargetPath) {
@@ -259,25 +320,6 @@ Created: ${new Date(props.created).toLocaleString()}
 Modified: ${new Date(props.modified).toLocaleString()}
   `.trim();
   alert(message);
-}
-
-function createMetadataItem(label, value) {
-  const item = document.createElement('div');
-  item.className = 'metadata-item';
-  
-  const labelSpan = document.createElement('span');
-  labelSpan.className = 'metadata-label';
-  labelSpan.textContent = label + ':';
-  
-  const valueSpan = document.createElement('span');
-  valueSpan.className = 'metadata-value';
-  valueSpan.textContent = value;
-  valueSpan.title = value;
-  
-  item.appendChild(labelSpan);
-  item.appendChild(valueSpan);
-  
-  return item;
 }
 
 function showToast(message, isError = false) {
@@ -429,6 +471,70 @@ toggleSidebarBtn.addEventListener('click', () => {
   sidebar.classList.toggle('collapsed');
   toggleSidebarBtn.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
   updateFloatingToggle();
+});
+
+// Bulk controls event listeners
+document.getElementById('selectAllBtn')?.addEventListener('click', selectAllFiles);
+document.getElementById('deselectAllBtn')?.addEventListener('click', clearSelection);
+
+document.getElementById('bulkDeleteBtn')?.addEventListener('click', async () => {
+  if (selectedFiles.size === 0) return;
+  
+  const count = selectedFiles.size;
+  if (!confirm(`Are you sure you want to delete ${count} file${count > 1 ? 's' : ''}?`)) {
+    return;
+  }
+  
+  let deletedCount = 0;
+  for (const filePath of selectedFiles) {
+    const result = await window.api.deleteFile(filePath);
+    if (result && result.success) {
+      deletedCount++;
+      const index = currentFiles.indexOf(filePath);
+      if (index !== -1) {
+        currentFiles.splice(index, 1);
+      }
+      
+      // Remove from favorites if present
+      const favIndex = currentSettings.favorites.indexOf(filePath);
+      if (favIndex > -1) {
+        currentSettings.favorites.splice(favIndex, 1);
+      }
+    }
+  }
+  
+  if (deletedCount > 0) {
+    await window.api.setSetting('favorites', currentSettings.favorites);
+    showToast(`Deleted ${deletedCount} file${deletedCount > 1 ? 's' : ''}`);
+    clearSelection();
+    await loadFolder(currentRootPath, false);
+  }
+});
+
+document.getElementById('bulkMoveBtn')?.addEventListener('click', async () => {
+  if (selectedFiles.size === 0) return;
+  const destFolder = await window.api.openDirectory();
+  if (destFolder) {
+    let movedCount = 0;
+    for (const filePath of selectedFiles) {
+      const fileName = filePath.split('\\').pop().split('/').pop();
+      const newPath = destFolder + (destFolder.endsWith('\\') || destFolder.endsWith('/') ? '' : '/') + fileName;
+      const result = await window.api.moveFile(filePath, newPath);
+      if (result && result.success) {
+        movedCount++;
+        const index = currentFiles.indexOf(filePath);
+        if (index !== -1) {
+          currentFiles.splice(index, 1);
+        }
+      }
+    }
+    
+    if (movedCount > 0) {
+      showToast(`Moved ${movedCount} file${movedCount > 1 ? 's' : ''}`);
+      clearSelection();
+      await loadFolder(currentRootPath, false);
+    }
+  }
 });
 
 // Create floating toggle button for when sidebar is collapsed
@@ -653,13 +759,47 @@ function renderGallery(files) {
     else if (currentSettings.defaultView === 'flex') itemClass = 'flex-view';
     
     item.className = `gallery-item ${itemClass}`;
+    item.dataset.filePath = file; // Store file path for selection tracking
     
-    const media = isVideo 
-      ? document.createElement('video') 
+    const media = isVideo
+      ? document.createElement('video')
       : document.createElement('img');
-      
+        
     media.src = `file://${file}`;
     media.className = 'gallery-media';
+    
+    // Track double-click state
+    let clickTimeout = null;
+    let lastClickTime = 0;
+    
+    // Click handler for selection (single click)
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const currentTime = new Date().getTime();
+      const timeDiff = currentTime - lastClickTime;
+      
+      // Check if this is a double-click (less than 300ms between clicks)
+      if (timeDiff < 300) {
+        // Double-click detected - open viewer
+        clearTimeout(clickTimeout);
+        openViewer(file, isVideo);
+      } else {
+        // Single click - select/deselect
+        clickTimeout = setTimeout(() => {
+          const addToSelection = e.ctrlKey || e.metaKey;
+          toggleFileSelection(file, addToSelection);
+        }, 300);
+      }
+      
+      lastClickTime = currentTime;
+    });
+    
+    // Double-click handler as backup
+    item.addEventListener('dblclick', (e) => {
+      e.preventDefault();
+      clearTimeout(clickTimeout);
+      openViewer(file, isVideo);
+    });
     
     if (isVideo) {
       media.muted = true;
@@ -721,8 +861,6 @@ function renderGallery(files) {
         });
       }
     }
-    
-    media.addEventListener('click', () => openViewer(file, isVideo));
     
     // Add right-click context menu
     item.addEventListener('contextmenu', (e) => {
@@ -1005,22 +1143,6 @@ async function deleteFile(filePath, itemElement) {
   }
 }
 
-// Show toast notification
-function showToast(message, type = 'success') {
-  const toast = document.createElement('div');
-  toast.className = `toast toast-${type}`;
-  toast.textContent = message;
-  document.body.appendChild(toast);
-  
-  setTimeout(() => {
-    toast.classList.add('show');
-  }, 10);
-  
-  setTimeout(() => {
-    toast.classList.remove('show');
-    setTimeout(() => toast.remove(), 300);
-  }, 3000);
-}
 
 // Open viewer modal
 let currentViewerIndex = 0;
@@ -1029,6 +1151,14 @@ function openViewer(file, isVideo) {
   currentViewerIndex = currentFiles.indexOf(file);
   showCurrentMedia();
   modal.style.display = 'flex';
+  
+  // Add EXIF and Adjustments buttons to viewer
+  if (window.exifViewer) {
+    window.exifViewer.addToViewer(file);
+  }
+  if (window.imageAdjustments) {
+    window.imageAdjustments.addToViewer();
+  }
 }
 
 function showCurrentMedia() {
@@ -1460,3 +1590,14 @@ if (window.enhancedFeatures) {
     window.enhancedFeatures.setupVirtualScrolling();
   });
 }
+
+// Expose currentFiles and currentViewerIndex globally for other modules
+window.currentFiles = currentFiles;
+window.currentViewerIndex = currentViewerIndex;
+
+// Listen for folder-selected event from drag-drop
+window.addEventListener('folder-selected', (e) => {
+  if (e.detail && typeof loadFolder === 'function') {
+    loadFolder(e.detail);
+  }
+});

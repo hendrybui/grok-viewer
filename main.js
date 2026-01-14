@@ -1,14 +1,99 @@
+/* eslint-env node */
+/* global require, __dirname, process, console */
+/* eslint-disable no-inner-declarations */
 // main.js
 const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
 const SettingsManager = require('./src/main/settings');
+const AppUpdater = require('./src/main/updater');
+const ExifHandler = require('./src/main/exif-handler');
 
-// Suppress GPU cache errors
+// Suppress GPU cache errors and disable GPU features for compatibility
 app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
 app.commandLine.appendSwitch('disable-gpu-program-cache');
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('no-sandbox');
 
 const settings = new SettingsManager();
+const exifHandler = new ExifHandler();
+let appUpdater;
+
+// Shared helpers
+async function scanDirectoryRecursive(directory, allExtensions) {
+  const mediaFiles = [];
+
+  try {
+    const entries = await fs.readdir(directory, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = path.join(directory, entry.name);
+
+      if (entry.isDirectory()) {
+        // Recursively scan subdirectories
+        const subDirFiles = await scanDirectoryRecursive(fullPath, allExtensions);
+        mediaFiles.push(...subDirFiles);
+      } else if (entry.isFile()) {
+        // Check if file is a supported media file
+        if (allExtensions.includes(path.extname(entry.name).toLowerCase())) {
+          mediaFiles.push(fullPath);
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`Error reading directory ${directory}:`, err);
+  }
+
+  return mediaFiles;
+}
+
+async function buildFolderTree(dirPath, imageExtensions, videoExtensions, isRoot = false) {
+  const folder = {
+    name: isRoot ? path.basename(dirPath) : path.basename(dirPath),
+    path: dirPath,
+    children: [],
+    imageCount: 0,
+    videoCount: 0
+  };
+
+  try {
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+
+    // Count media files in this directory
+    for (const entry of entries) {
+      if (entry.isFile()) {
+        const ext = path.extname(entry.name).toLowerCase();
+        if (imageExtensions.includes(ext)) {
+          folder.imageCount++;
+        } else if (videoExtensions.includes(ext)) {
+          folder.videoCount++;
+        }
+      }
+    }
+
+    // Build child folders
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const childPath = path.join(dirPath, entry.name);
+        const childFolder = await buildFolderTree(childPath, imageExtensions, videoExtensions, false);
+        // Only include folders that have files (directly or in subfolders)
+        const childTotal = childFolder.imageCount + childFolder.videoCount + (childFolder.totalImageCount || 0) + (childFolder.totalVideoCount || 0);
+        if (childTotal > 0) {
+          folder.children.push(childFolder);
+        }
+      }
+    }
+
+    // Calculate total counts including subfolders
+    folder.totalImageCount = folder.imageCount + folder.children.reduce((sum, child) => sum + (child.totalImageCount || 0), 0);
+    folder.totalVideoCount = folder.videoCount + folder.children.reduce((sum, child) => sum + (child.totalVideoCount || 0), 0);
+
+  } catch (err) {
+    console.error(`Error reading directory ${dirPath}:`, err);
+  }
+
+  return folder;
+}
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -23,6 +108,9 @@ function createWindow() {
   });
 
   mainWindow.loadFile('src/renderer/index.html');
+  
+  // Initialize auto-updater
+  appUpdater = new AppUpdater(mainWindow);
   
   // Create menu
   createMenu(mainWindow);
@@ -216,36 +304,7 @@ ipcMain.handle('files:scan', async (event, dirPath) => {
       ...userSettings.supportedFormats.images,
       ...userSettings.supportedFormats.videos
     ];
-    
-    // Recursive function to scan directories
-    async function scanDirectory(directory) {
-      const mediaFiles = [];
-      
-      try {
-        const entries = await fs.readdir(directory, { withFileTypes: true });
-        
-        for (const entry of entries) {
-          const fullPath = path.join(directory, entry.name);
-          
-          if (entry.isDirectory()) {
-            // Recursively scan subdirectories
-            const subDirFiles = await scanDirectory(fullPath);
-            mediaFiles.push(...subDirFiles);
-          } else if (entry.isFile()) {
-            // Check if file is a supported media file
-            if (allExtensions.includes(path.extname(entry.name).toLowerCase())) {
-              mediaFiles.push(fullPath);
-            }
-          }
-        }
-      } catch (err) {
-        console.error(`Error reading directory ${directory}:`, err);
-      }
-      
-      return mediaFiles;
-    }
-    
-    return await scanDirectory(dirPath);
+    return await scanDirectoryRecursive(dirPath, allExtensions);
   } catch (err) {
     console.error('Error reading directory:', err);
     return [];
@@ -411,55 +470,7 @@ ipcMain.handle('files:getFolderTree', async (event, rootPath) => {
     const imageExtensions = userSettings.supportedFormats.images;
     const videoExtensions = userSettings.supportedFormats.videos;
 
-    async function buildTree(dirPath, isRoot = false) {
-      const folder = {
-        name: isRoot ? path.basename(dirPath) : path.basename(dirPath),
-        path: dirPath,
-        children: [],
-        imageCount: 0,
-        videoCount: 0
-      };
-
-      try {
-        const entries = await fs.readdir(dirPath, { withFileTypes: true });
-        
-        // Count media files in this directory
-        for (const entry of entries) {
-          if (entry.isFile()) {
-            const ext = path.extname(entry.name).toLowerCase();
-            if (imageExtensions.includes(ext)) {
-              folder.imageCount++;
-            } else if (videoExtensions.includes(ext)) {
-              folder.videoCount++;
-            }
-          }
-        }
-
-        // Build child folders
-        for (const entry of entries) {
-          if (entry.isDirectory()) {
-            const childPath = path.join(dirPath, entry.name);
-            const childFolder = await buildTree(childPath, false);
-            // Only include folders that have files (directly or in subfolders)
-            const childTotal = childFolder.imageCount + childFolder.videoCount + (childFolder.totalImageCount || 0) + (childFolder.totalVideoCount || 0);
-            if (childTotal > 0) {
-              folder.children.push(childFolder);
-            }
-          }
-        }
-
-        // Calculate total counts including subfolders
-        folder.totalImageCount = folder.imageCount + folder.children.reduce((sum, child) => sum + (child.totalImageCount || 0), 0);
-        folder.totalVideoCount = folder.videoCount + folder.children.reduce((sum, child) => sum + (child.totalVideoCount || 0), 0);
-        
-      } catch (err) {
-        console.error(`Error reading directory ${dirPath}:`, err);
-      }
-
-      return folder;
-    }
-
-    return await buildTree(rootPath, true);
+    return await buildFolderTree(rootPath, imageExtensions, videoExtensions, true);
   } catch (err) {
     console.error('Error building folder tree:', err);
     return null;
@@ -560,4 +571,71 @@ ipcMain.handle('files:batchDelete', async (event, files) => {
     }
   }
   return results;
+});
+
+// 14. Handle EXIF metadata extraction
+ipcMain.handle('file:getMetadata', async (event, filePath) => {
+  try {
+    return await exifHandler.extractMetadata(filePath);
+  } catch (error) {
+    console.error('Error getting metadata:', error);
+    return { error: error.message };
+  }
+});
+
+ipcMain.handle('files:getBatchMetadata', async (event, filePaths) => {
+  try {
+    return await exifHandler.extractBatchMetadata(filePaths);
+  } catch (error) {
+    console.error('Error getting batch metadata:', error);
+    return { error: error.message };
+  }
+});
+
+// 15. Handle update checks
+ipcMain.handle('app:checkForUpdates', async () => {
+  if (appUpdater) {
+    appUpdater.checkForUpdates();
+  }
+});
+
+// 16. Handle saving a file (for face swap results)
+ipcMain.handle('file:save', async (event, blob, fileName) => {
+  try {
+    const { dialog } = require('electron');
+    
+    // Show save dialog
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      defaultPath: fileName,
+      filters: [
+        { name: 'PNG Image', extensions: ['png'] },
+        { name: 'JPEG Image', extensions: ['jpg', 'jpeg'] }
+      ]
+    });
+    
+    if (canceled || !filePath) {
+      return { success: false, error: 'Save canceled' };
+    }
+    
+    // Convert blob to buffer and save
+    const arrayBuffer = await blob.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    await fs.writeFile(filePath, buffer);
+    
+    return { success: true, path: filePath };
+  } catch (err) {
+    console.error('Error saving file:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 17. Handle moving files (for bulk operations)
+ipcMain.handle('file:move', async (event, sourcePath, targetPath) => {
+  try {
+    await fs.rename(sourcePath, targetPath);
+    return { success: true };
+  } catch (err) {
+    console.error('Error moving file:', err);
+    return { success: false, error: err.message };
+  }
 });

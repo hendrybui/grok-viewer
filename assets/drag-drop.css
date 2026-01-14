@@ -1,0 +1,53 @@
+/* Drag and Drop Styles */
+
+.gallery.drag-over {
+  background: rgba(0, 255, 157, 0.1);
+  border: 3px dashed #00ff9d;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.gallery.drag-over::after {
+  content: '📁 Drop files here';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 24px;
+  color: #00ff9d;
+  font-weight: 600;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.content-area.drag-over {
+  background: rgba(0, 255, 157, 0.05);
+}
+
+/* Drag over animation */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 20px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.toast {
+  animation: slideUp 0.3s ease;
+}
+
+.toast.toast-success {
+  background: linear-gradient(135deg, #00ff9d 0%, #00d4ff 100%);
+  color: #0a0a0a;
+  font-weight: 600;
+}
+
+.toast.toast-error {
+  background: linear-gradient(135deg, #ff4757 0%, #ff6b81 100%);
+  color: white;
+  font-weight: 600;
+}

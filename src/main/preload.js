@@ -25,6 +25,18 @@ contextBridge.exposeInMainWorld('api', {
   batchMoveFiles: (files, targetDir) => ipcRenderer.invoke('files:batchMove', files, targetDir),
   batchDeleteFiles: (files) => ipcRenderer.invoke('files:batchDelete', files),
   
+  // EXIF metadata
+  getFileMetadata: (filePath) => ipcRenderer.invoke('file:getMetadata', filePath),
+  getBatchMetadata: (filePaths) => ipcRenderer.invoke('files:getBatchMetadata', filePaths),
+  
+  // App updates
+  checkForUpdates: () => ipcRenderer.invoke('app:checkForUpdates'),
+  onUpdateStatus: (callback) => ipcRenderer.on('update-status', (event, status) => callback(status)),
+  
+  // File save and move (for face swap)
+  saveFile: (blob, fileName) => ipcRenderer.invoke('file:save', blob, fileName),
+  moveFile: (sourcePath, targetPath) => ipcRenderer.invoke('file:move', sourcePath, targetPath),
+  
   // Listen to events from main process
   onFolderSelected: (callback) => ipcRenderer.on('folder-selected', (event, path) => callback(path)),
   onViewChanged: (callback) => ipcRenderer.on('view-changed', (event, view) => callback(view)),

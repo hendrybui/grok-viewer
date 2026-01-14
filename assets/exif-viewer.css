@@ -1,0 +1,221 @@
+/* EXIF Metadata Viewer Styles */
+
+.exif-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 400px;
+  height: 100vh;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border-left: 2px solid rgba(0, 255, 157, 0.3);
+  box-shadow: -5px 0 30px rgba(0, 0, 0, 0.5);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(0);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.exif-panel.hidden {
+  transform: translateX(100%);
+}
+
+.exif-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(0, 255, 157, 0.2);
+}
+
+.exif-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #00ff9d;
+  text-shadow: 0 0 10px rgba(0, 255, 157, 0.5);
+}
+
+.exif-close {
+  background: none;
+  border: none;
+  color: #ffffff;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 5px 10px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.exif-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ff4757;
+}
+
+.exif-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.exif-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.exif-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.exif-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 157, 0.3);
+  border-radius: 4px;
+}
+
+.exif-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 157, 0.5);
+}
+
+.exif-loading,
+.exif-error {
+  text-align: center;
+  padding: 40px 20px;
+  color: #888;
+  font-size: 14px;
+}
+
+.exif-error {
+  color: #ff4757;
+}
+
+.exif-section {
+  margin-bottom: 25px;
+}
+
+.exif-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #00d4ff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+  padding-bottom: 8px;
+}
+
+.exif-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.exif-table tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.exif-table tr:last-child {
+  border-bottom: none;
+}
+
+.exif-label {
+  padding: 10px 0;
+  color: #aaa;
+  font-size: 13px;
+  font-weight: 500;
+  width: 40%;
+  vertical-align: top;
+}
+
+.exif-value {
+  padding: 10px 0;
+  color: #ffffff;
+  font-size: 13px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  text-align: right;
+  word-break: break-word;
+}
+
+.exif-actions {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.exif-copy-btn {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #00d4ff 0%, #00ff9d 100%);
+  border: none;
+  border-radius: 8px;
+  color: #0a0a0a;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+}
+
+.exif-copy-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 212, 255, 0.5);
+}
+
+.exif-copy-btn:active {
+  transform: translateY(0);
+}
+
+/* Info button in viewer */
+.exif-info-btn {
+  position: absolute;
+  top: 70px;
+  right: 20px;
+  padding: 10px 20px;
+  background: rgba(0, 212, 255, 0.2);
+  border: 1px solid rgba(0, 212, 255, 0.5);
+  border-radius: 8px;
+  color: #00d4ff;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s;
+  backdrop-filter: blur(10px);
+  z-index: 1001;
+}
+
+.exif-info-btn:hover {
+  background: rgba(0, 212, 255, 0.3);
+  border-color: #00d4ff;
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+}
+
+/* Responsive for smaller screens */
+@media (max-width: 768px) {
+  .exif-panel {
+    width: 100%;
+  }
+  
+  .exif-label,
+  .exif-value {
+    display: block;
+    width: 100%;
+    text-align: left;
+  }
+  
+  .exif-label {
+    padding-bottom: 4px;
+    font-weight: 600;
+  }
+  
+  .exif-value {
+    padding-top: 4px;
+    padding-bottom: 12px;
+  }
+}
+
+/* Keyboard shortcut hint */
+.exif-info-btn::after {
+  content: ' (I)';
+  font-size: 11px;
+  opacity: 0.7;
+  margin-left: 4px;
+}

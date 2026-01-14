@@ -3,14 +3,21 @@
   "version": "1.0.0",
   "description": "A glossy local media viewer for Neo Imagine files",
   "main": "main.js",
-  "author": "Your Name",
+  "author": "hendrybui",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder"
+    "build": "electron-builder",
+    "test": "node test-upgrades.js",
+    "lint": "eslint main.js src/**/*.js"
   },
   "build": {
-    "appId": "com.yourbusiness.grokviewer",
+    "appId": "com.hendrybui.grokviewer",
     "productName": "Grok Viewer",
+    "publish": {
+      "provider": "github",
+      "owner": "hendrybui",
+      "repo": "grok-viewer"
+    },
     "directories": {
       "output": "dist"
     },
@@ -29,12 +36,14 @@
     }
   },
   "devDependencies": {
-    "electron": "^33.0.0",
-    "electron-builder": "^24.9.1"
+    "electron": "^39.2.7",
+    "electron-builder": "^26.4.0",
+    "eslint": "^8.57.0"
   },
-  "preload": "C:\\Users\\kentb\\grok-viewer\\preload.js",
   "dependencies": {
     "electron-store": "^11.0.2",
-    "sharp": "^0.33.5"
+    "electron-updater": "^6.7.3",
+    "requirements": "^3.0.0",
+    "sharp": "^0.34.5"
   }
 }

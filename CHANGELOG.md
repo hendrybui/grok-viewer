@@ -1,5 +1,44 @@
 # Changelog
 
+## [Unreleased] - 2026-01-08
+
+### Added
+- **EXIF Metadata Viewer**: Press `I` in image viewer to see comprehensive metadata
+  - File information (name, size, dates)
+  - Image properties (dimensions, megapixels, aspect ratio)
+  - Technical details (format, color space, channels, bit depth, DPI)
+  - Color profile detection
+  - Copy all metadata to clipboard
+- **Auto-Update System**: Automatic update checks with GitHub releases integration
+  - Background update downloads
+  - User-friendly update notifications
+  - One-click install and restart
+  - Update status messages
+- **Development Tools**:
+  - ESLint configuration for code quality
+  - Automated test suite (`npm test`)
+  - Additional npm scripts for linting
+
+### Changed
+- **Updated Electron**: 33.0.0 → 39.2.7 (6 major versions)
+- **Updated electron-builder**: 24.9.1 → 26.4.0
+- **Updated Sharp**: 0.33.5 → 0.34.5 (security patches)
+- **Package metadata**: Fixed hardcoded paths, updated author info
+
+### Security
+- All dependencies scanned with Trivy - 0 vulnerabilities found
+- Content Security Policy verified
+- Proper IPC context isolation maintained
+
+### Documentation
+- Added UPGRADE_SUMMARY.md with detailed technical notes
+- Added QUICK_REFERENCE.md for users and developers
+- Added UPGRADE_COMPLETE.md with upgrade verification
+
+---
+
+# Changelog
+
 ## Version 2.0.0 - Comprehensive Feature Update (2025)
 
 ### 🎉 Major Features Added
