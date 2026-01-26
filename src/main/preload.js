@@ -37,6 +37,15 @@ contextBridge.exposeInMainWorld('api', {
   saveFile: (blob, fileName) => ipcRenderer.invoke('file:save', blob, fileName),
   moveFile: (sourcePath, targetPath) => ipcRenderer.invoke('file:move', sourcePath, targetPath),
   
+  // Grok Vision APIs
+  analyzeImage: (imagePath) => ipcRenderer.invoke('grok:analyzeImage', imagePath),
+  batchAnalyze: (imagePaths) => ipcRenderer.invoke('grok:batchAnalyze', imagePaths),
+  compareImages: (imagePath1, imagePath2) => ipcRenderer.invoke('grok:compareImages', imagePath1, imagePath2),
+  generateSmartThumbnail: (imagePath, size, outputPath) => ipcRenderer.invoke('grok:generateSmartThumbnail', imagePath, size, outputPath),
+  categorizeImages: (imagePaths) => ipcRenderer.invoke('grok:categorizeImages', imagePaths),
+  clearGrokCache: () => ipcRenderer.invoke('grok:clearCache'),
+  getGrokCacheStats: () => ipcRenderer.invoke('grok:getCacheStats'),
+  
   // Listen to events from main process
   onFolderSelected: (callback) => ipcRenderer.on('folder-selected', (event, path) => callback(path)),
   onViewChanged: (callback) => ipcRenderer.on('view-changed', (event, view) => callback(view)),

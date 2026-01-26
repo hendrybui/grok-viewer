@@ -1,22 +1,42 @@
 /* eslint-env node */
-/* global require, __dirname, process, console */
-/* eslint-disable no-inner-declarations */
 // main.js
 const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
-const SettingsManager = require('./src/main/settings');
-const AppUpdater = require('./src/main/updater');
 const ExifHandler = require('./src/main/exif-handler');
+const GrokVision = require('./src/main/grok-vision');
 
-// Suppress GPU cache errors for compatibility (GPU enabled for visual effects)
-app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
-app.commandLine.appendSwitch('disable-gpu-program-cache');
-app.commandLine.appendSwitch('no-sandbox');
+// Note: GPU acceleration is enabled by default in Electron
+// Command line switches are not needed for modern GPU support
 
-const settings = new SettingsManager();
+let settings;
 const exifHandler = new ExifHandler();
 let appUpdater;
+let grokVision;
+
+// Initialize settings and updater after app is ready
+function initAppModules(mainWindow) {
+  try {
+    const SettingsManager = require('./src/main/settings');
+    settings = new SettingsManager();
+  } catch (err) {
+    console.warn('Settings initialization failed:', err.message);
+  }
+  
+  try {
+    const AppUpdater = require('./src/main/updater');
+    appUpdater = new AppUpdater(mainWindow);
+  } catch (err) {
+    console.warn('Auto-updater not available:', err.message);
+  }
+
+  try {
+    grokVision = new GrokVision();
+    console.log('Grok Vision initialized successfully');
+  } catch (err) {
+    console.warn('Grok Vision initialization failed:', err.message);
+  }
+}
 
 // Shared helpers
 async function scanDirectoryRecursive(directory, allExtensions) {
@@ -108,8 +128,8 @@ function createWindow() {
 
   mainWindow.loadFile('src/renderer/index.html');
   
-  // Initialize auto-updater
-  appUpdater = new AppUpdater(mainWindow);
+  // Initialize settings and updater after window is ready
+  initAppModules(mainWindow);
   
   // Create menu
   createMenu(mainWindow);
@@ -635,6 +655,104 @@ ipcMain.handle('file:move', async (event, sourcePath, targetPath) => {
     return { success: true };
   } catch (err) {
     console.error('Error moving file:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 18. Grok Vision - Analyze single image
+ipcMain.handle('grok:analyzeImage', async (event, imagePath) => {
+  try {
+    if (!grokVision) {
+      return { success: false, error: 'Grok Vision not initialized' };
+    }
+    const analysis = await grokVision.analyzeImage(imagePath);
+    return { success: true, analysis };
+  } catch (err) {
+    console.error('Error analyzing image with Grok Vision:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 19. Grok Vision - Batch analyze images
+ipcMain.handle('grok:batchAnalyze', async (event, imagePaths) => {
+  try {
+    if (!grokVision) {
+      return { success: false, error: 'Grok Vision not initialized' };
+    }
+    const results = await grokVision.batchAnalyze(imagePaths);
+    return { success: true, results };
+  } catch (err) {
+    console.error('Error batch analyzing images with Grok Vision:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 20. Grok Vision - Compare two images
+ipcMain.handle('grok:compareImages', async (event, imagePath1, imagePath2) => {
+  try {
+    if (!grokVision) {
+      return { success: false, error: 'Grok Vision not initialized' };
+    }
+    const comparison = await grokVision.compareImages(imagePath1, imagePath2);
+    return { success: true, comparison };
+  } catch (err) {
+    console.error('Error comparing images with Grok Vision:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 21. Grok Vision - Generate smart thumbnail
+ipcMain.handle('grok:generateSmartThumbnail', async (event, imagePath, size = 200, outputPath = null) => {
+  try {
+    if (!grokVision) {
+      return { success: false, error: 'Grok Vision not initialized' };
+    }
+    const thumbnailPath = await grokVision.generateSmartThumbnail(imagePath, size, outputPath);
+    return { success: true, thumbnailPath };
+  } catch (err) {
+    console.error('Error generating smart thumbnail with Grok Vision:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 22. Grok Vision - Categorize images
+ipcMain.handle('grok:categorizeImages', async (event, imagePaths) => {
+  try {
+    if (!grokVision) {
+      return { success: false, error: 'Grok Vision not initialized' };
+    }
+    const categories = await grokVision.categorizeImages(imagePaths);
+    return { success: true, categories };
+  } catch (err) {
+    console.error('Error categorizing images with Grok Vision:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 23. Grok Vision - Clear cache
+ipcMain.handle('grok:clearCache', async () => {
+  try {
+    if (!grokVision) {
+      return { success: false, error: 'Grok Vision not initialized' };
+    }
+    grokVision.clearCache();
+    return { success: true };
+  } catch (err) {
+    console.error('Error clearing Grok Vision cache:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 24. Grok Vision - Get cache stats
+ipcMain.handle('grok:getCacheStats', async () => {
+  try {
+    if (!grokVision) {
+      return { success: false, error: 'Grok Vision not initialized' };
+    }
+    const stats = grokVision.getCacheStats();
+    return { success: true, stats };
+  } catch (err) {
+    console.error('Error getting Grok Vision cache stats:', err);
     return { success: false, error: err.message };
   }
 });
