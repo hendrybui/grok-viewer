@@ -1,0 +1,42 @@
+name: Security Audit Fix
+
+on:
+  workflow_dispatch:   # allows manual trigger
+  schedule:
+    - cron: "0 3 * * 0"   # runs weekly at 3 AM UTC
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run npm audit
+        run: npm audit || true
+
+      - name: Apply safe fixes
+        run: npm audit fix
+
+      - name: Try lockfile-only fixes
+        run: npm audit fix --package-lock-only
+
+      - name: Force fix (optional, controlled)
+        if: ${{ github.event.inputs.force_fix == 'true' }}
+        run: npm audit fix --force
+
+      - name: Commit changes
+        uses: EndBug/add-and-commit@v9
+        with:
+          author_name: github-actions
+          author_email: actions@github.com
+          message: "chore: apply npm audit fixes"
