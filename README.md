@@ -1,5 +1,7 @@
 # Grok Viewer
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/b9d63147fe6f4c0693ecf8b0144f78f3)](https://app.codacy.com/gh/hendrybui/grok-viewer?utm_source=github.com&utm_medium=referral&utm_content=hendrybui/grok-viewer&utm_campaign=Badge_Grade)
+
 A modern, feature-rich local media viewer for images and videos built with Electron.
 
 ## Features
