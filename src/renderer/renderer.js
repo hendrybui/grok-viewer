@@ -340,28 +340,56 @@ function showToast(message, isError = false) {
 
 // Initialize settings
 async function initSettings() {
-  currentSettings = await window.api.getSettings();
-  
-  // Initialize favorites if not present
-  if (!currentSettings.favorites) {
-    currentSettings.favorites = [];
+  try {
+    currentSettings = await window.api.getSettings();
+    
+    // Initialize favorites if not present
+    if (!currentSettings.favorites) {
+      currentSettings.favorites = [];
+    }
+    
+    // Apply theme color - do this first before trying to set dropdown
+    applyTheme(currentSettings.themeColor || 'purple');
+    
+    // Apply settings to UI - wrap in try-catch to handle if elements don't exist
+    try {
+      if (document.getElementById('themeColor')) {
+        document.getElementById('themeColor').value = currentSettings.themeColor || 'purple';
+      }
+      if (document.getElementById('autoPlayVideos')) {
+        document.getElementById('autoPlayVideos').checked = currentSettings.autoPlayVideos;
+      }
+      if (document.getElementById('showFileNames')) {
+        document.getElementById('showFileNames').checked = currentSettings.showFileNames;
+      }
+      if (document.getElementById('thumbnailSize')) {
+        document.getElementById('thumbnailSize').value = currentSettings.thumbnailSize;
+      }
+      if (document.getElementById('viewerMode')) {
+        document.getElementById('viewerMode').value = currentSettings.viewerMode || 'fit';
+      }
+      if (document.getElementById('slideShowInterval')) {
+        document.getElementById('slideShowInterval').value = currentSettings.slideShowInterval / 1000;
+      }
+      if (document.getElementById('sortSelect')) {
+        document.getElementById('sortSelect').value = currentSettings.sortBy;
+      }
+      if (document.getElementById('filterSelect')) {
+        document.getElementById('filterSelect').value = currentSettings.filterBy || 'all';
+      }
+    } catch (err) {
+      console.error('Error applying settings to UI elements:', err);
+    }
+    
+    // Apply thumbnail size class
+    if (gallery) {
+      gallery.className = `gallery thumbnail-${currentSettings.thumbnailSize}`;
+    }
+  } catch (err) {
+    console.error('Error loading settings:', err);
+    // Apply default theme even if settings fail to load
+    applyTheme('purple');
   }
-  
-  // Apply theme color
-  applyTheme(currentSettings.themeColor || 'purple');
-  
-  // Apply settings to UI
-  document.getElementById('themeColor').value = currentSettings.themeColor || 'purple';
-  document.getElementById('autoPlayVideos').checked = currentSettings.autoPlayVideos;
-  document.getElementById('showFileNames').checked = currentSettings.showFileNames;
-  document.getElementById('thumbnailSize').value = currentSettings.thumbnailSize;
-  document.getElementById('viewerMode').value = currentSettings.viewerMode || 'fit';
-  document.getElementById('slideShowInterval').value = currentSettings.slideShowInterval / 1000;
-  document.getElementById('sortSelect').value = currentSettings.sortBy;
-  document.getElementById('filterSelect').value = currentSettings.filterBy || 'all';
-  
-  // Apply thumbnail size class
-  gallery.className = `gallery thumbnail-${currentSettings.thumbnailSize}`;
 }
 
 // Button event listeners
@@ -380,40 +408,58 @@ closeSettingsBtn.addEventListener('click', () => {
   settingsPanel.classList.remove('show');
 });
 
-// Settings event listeners
-document.getElementById('themeColor').addEventListener('change', async (e) => {
-  await window.api.setSetting('themeColor', e.target.value);
-  currentSettings.themeColor = e.target.value;
-  applyTheme(e.target.value);
-});
+// Settings event listeners - with null checks for robustness
+const themeColorEl = document.getElementById('themeColor');
+if (themeColorEl) {
+  themeColorEl.addEventListener('change', async (e) => {
+    await window.api.setSetting('themeColor', e.target.value);
+    currentSettings.themeColor = e.target.value;
+    applyTheme(e.target.value);
+  });
+}
 
-document.getElementById('autoPlayVideos').addEventListener('change', async (e) => {
-  await window.api.setSetting('autoPlayVideos', e.target.checked);
-  currentSettings.autoPlayVideos = e.target.checked;
-});
+const autoPlayVideosEl = document.getElementById('autoPlayVideos');
+if (autoPlayVideosEl) {
+  autoPlayVideosEl.addEventListener('change', async (e) => {
+    await window.api.setSetting('autoPlayVideos', e.target.checked);
+    currentSettings.autoPlayVideos = e.target.checked;
+  });
+}
 
-document.getElementById('showFileNames').addEventListener('change', async (e) => {
-  await window.api.setSetting('showFileNames', e.target.checked);
-  currentSettings.showFileNames = e.target.checked;
-  renderGallery(currentFiles);
-});
+const showFileNamesEl = document.getElementById('showFileNames');
+if (showFileNamesEl) {
+  showFileNamesEl.addEventListener('change', async (e) => {
+    await window.api.setSetting('showFileNames', e.target.checked);
+    currentSettings.showFileNames = e.target.checked;
+    renderGallery(currentFiles);
+  });
+}
 
-document.getElementById('thumbnailSize').addEventListener('change', async (e) => {
-  await window.api.setSetting('thumbnailSize', e.target.value);
-  currentSettings.thumbnailSize = e.target.value;
-  gallery.className = `gallery thumbnail-${e.target.value}`;
-});
+const thumbnailSizeEl = document.getElementById('thumbnailSize');
+if (thumbnailSizeEl) {
+  thumbnailSizeEl.addEventListener('change', async (e) => {
+    await window.api.setSetting('thumbnailSize', e.target.value);
+    currentSettings.thumbnailSize = e.target.value;
+    gallery.className = `gallery thumbnail-${e.target.value}`;
+  });
+}
 
-document.getElementById('viewerMode').addEventListener('change', async (e) => {
-  await window.api.setSetting('viewerMode', e.target.value);
-  currentSettings.viewerMode = e.target.value;
-});
+const viewerModeEl = document.getElementById('viewerMode');
+if (viewerModeEl) {
+  viewerModeEl.addEventListener('change', async (e) => {
+    await window.api.setSetting('viewerMode', e.target.value);
+    currentSettings.viewerMode = e.target.value;
+  });
+}
 
-document.getElementById('slideShowInterval').addEventListener('change', async (e) => {
-  const value = parseInt(e.target.value) * 1000;
-  await window.api.setSetting('slideShowInterval', value);
-  currentSettings.slideShowInterval = value;
-});
+const slideShowIntervalEl = document.getElementById('slideShowInterval');
+if (slideShowIntervalEl) {
+  slideShowIntervalEl.addEventListener('change', async (e) => {
+    const value = parseInt(e.target.value) * 1000;
+    await window.api.setSetting('slideShowInterval', value);
+    currentSettings.slideShowInterval = value;
+  });
+}
 
 document.getElementById('resetSettings').addEventListener('click', async () => {
   await window.api.resetSettings();
