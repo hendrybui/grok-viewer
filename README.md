@@ -47,9 +47,17 @@ npm start
 
 ## Building
 
+Build for your current platform:
 ```bash
 npm run build
 ```
+
+Build AppImage for Linux:
+```bash
+npm run build:appimage
+```
+
+The built files will be in the `dist` directory.
 
 ## Settings
 

@@ -11,7 +11,8 @@ Concise, actionable guidance for AI coding agents working in this Electron media
 - `main.js` — IPC handlers: `dialog:openDirectory` returns selected folder path, `files:scan` returns array of absolute file paths for media files
 - `preload.js` — Exposes `window.api.openDirectory()` and `window.api.scanFiles(path)` (both async via `ipcRenderer.invoke`)
 - `renderer.js` — Gallery + modal UI; sets `media.src = \`file://${file}\``; clears `viewerContent.innerHTML` on modal close to stop playback
-- `package.json` — Scripts: `npm start` (launch app), `npm run build` (package with electron-builder)
+- `package.json` — Scripts: `npm start` (launch app), `npm run build` (package with electron-builder), `npm run build:appimage` (build Linux AppImage), `npm test` (run tests)
+- `test-upgrades.js` — Test script that verifies all upgrades and dependencies are properly installed
 
 ## Critical Rules (Do Not Change Without Reviewing All Three Files)
 - **`window.api` is the integration boundary** — preserve method names and signatures; update `preload.js` + `main.js` + `renderer.js` together
@@ -42,5 +43,11 @@ npm start
 
 Build distributable:
 ```bat
-npm run build
+npm run build              # Build for current platform
+npm run build:appimage     # Build AppImage for Linux
+```
+
+Test:
+```bat
+npm test                   # Run upgrade verification tests
 ```
