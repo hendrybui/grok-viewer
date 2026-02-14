@@ -39,8 +39,7 @@
       "target": [
         "AppImage"
       ],
-      "category": "Graphics",
-      "icon": "Build/icon.ico"
+      "category": "Graphics"
     }
   },
   "devDependencies": {
