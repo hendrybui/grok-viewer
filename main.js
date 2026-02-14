@@ -20,7 +20,39 @@ function initAppModules(mainWindow) {
     const SettingsManager = require('./src/main/settings');
     settings = new SettingsManager();
   } catch (err) {
-    console.warn('Settings initialization failed:', err.message);
+    console.error('Settings initialization failed:', err.message);
+    // Create a minimal fallback settings object
+    settings = {
+      get: (key) => {
+        const defaults = {
+          defaultView: 'grid',
+          sortBy: 'name',
+          autoPlayVideos: true,
+          showFileNames: true,
+          thumbnailSize: 'medium',
+          themeColor: 'purple',
+          supportedFormats: {
+            images: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'],
+            videos: ['.mp4', '.mov', '.webm', '.avi', '.mkv']
+          }
+        };
+        return key ? defaults[key] : defaults;
+      },
+      set: () => {},
+      getAll: () => ({
+        defaultView: 'grid',
+        sortBy: 'name',
+        autoPlayVideos: true,
+        showFileNames: true,
+        thumbnailSize: 'medium',
+        themeColor: 'purple',
+        supportedFormats: {
+          images: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'],
+          videos: ['.mp4', '.mov', '.webm', '.avi', '.mkv']
+        }
+      }),
+      reset: () => {}
+    };
   }
   
   try {
