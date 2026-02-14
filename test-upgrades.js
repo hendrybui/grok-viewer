@@ -10,7 +10,7 @@ console.log('🧪 Running Grok Viewer Upgrade Tests...\n');
 console.log('✅ Test 1: Checking Dependencies');
 const packageJson = require('./package.json');
 const expectedDeps = {
-  'electron': '^39',
+  'electron': '^40',
   'electron-builder': '^26',
   'sharp': '^0.34',
   'electron-updater': '^6'
