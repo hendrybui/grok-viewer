@@ -4,6 +4,9 @@
   "description": "A glossy local media viewer for Neo Imagine files",
   "main": "main.js",
   "author": "hendrybui",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",

@@ -164,8 +164,8 @@ npm run lint
 
 ## Compatibility
 
-### Minimum Requirements (unchanged)
-- Node.js 16.x or higher
+### Minimum Requirements
+- Node.js 20.x or higher (required for latest Electron and build dependencies)
 - Windows 10/11, macOS 10.15+, or Linux
 
 ### Breaking Changes

@@ -21,36 +21,31 @@ function initAppModules(mainWindow) {
     settings = new SettingsManager();
   } catch (err) {
     console.error('Settings initialization failed:', err.message);
-    // Create a minimal fallback settings object
-    settings = {
-      get: (key) => {
-        const defaults = {
-          defaultView: 'grid',
-          sortBy: 'name',
-          autoPlayVideos: true,
-          showFileNames: true,
-          thumbnailSize: 'medium',
-          themeColor: 'purple',
-          supportedFormats: {
-            images: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'],
-            videos: ['.mp4', '.mov', '.webm', '.avi', '.mkv']
-          }
-        };
-        return key ? defaults[key] : defaults;
+    // Create a complete fallback settings object matching default-settings.json
+    const fallbackDefaults = {
+      theme: 'dark',
+      themeColor: 'purple',
+      defaultView: 'grid',
+      viewerMode: 'fit',
+      thumbnailSize: 'medium',
+      autoPlayVideos: true,
+      sortBy: 'name',
+      sortOrder: 'asc',
+      filterBy: 'all',
+      supportedFormats: {
+        images: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'],
+        videos: ['.mp4', '.mov', '.webm', '.avi', '.mkv']
       },
+      gridColumns: 'auto',
+      showFileNames: true,
+      slideShowInterval: 3000,
+      favorites: []
+    };
+    
+    settings = {
+      get: (key) => key ? fallbackDefaults[key] : undefined,
       set: () => {},
-      getAll: () => ({
-        defaultView: 'grid',
-        sortBy: 'name',
-        autoPlayVideos: true,
-        showFileNames: true,
-        thumbnailSize: 'medium',
-        themeColor: 'purple',
-        supportedFormats: {
-          images: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'],
-          videos: ['.mp4', '.mov', '.webm', '.avi', '.mkv']
-        }
-      }),
+      getAll: () => fallbackDefaults,
       reset: () => {}
     };
   }

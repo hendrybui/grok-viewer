@@ -387,8 +387,35 @@ async function initSettings() {
     }
   } catch (err) {
     console.error('Error loading settings:', err);
+    
+    // Fall back to a full default settings object so downstream code can rely on required fields
+    currentSettings = {
+      theme: 'dark',
+      themeColor: 'purple',
+      defaultView: 'grid',
+      viewerMode: 'fit',
+      thumbnailSize: 'medium',
+      autoPlayVideos: true,
+      sortBy: 'name',
+      sortOrder: 'asc',
+      filterBy: 'all',
+      supportedFormats: {
+        images: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'],
+        videos: ['.mp4', '.mov', '.webm', '.avi', '.mkv']
+      },
+      gridColumns: 'auto',
+      showFileNames: true,
+      slideShowInterval: 3000,
+      favorites: []
+    };
+    
     // Apply default theme even if settings fail to load
-    applyTheme('purple');
+    applyTheme(currentSettings.themeColor);
+    
+    // Ensure gallery still has a valid thumbnail size class when falling back
+    if (gallery) {
+      gallery.className = `gallery thumbnail-${currentSettings.thumbnailSize}`;
+    }
   }
 }
 
@@ -440,7 +467,9 @@ if (thumbnailSizeEl) {
   thumbnailSizeEl.addEventListener('change', async (e) => {
     await window.api.setSetting('thumbnailSize', e.target.value);
     currentSettings.thumbnailSize = e.target.value;
-    gallery.className = `gallery thumbnail-${e.target.value}`;
+    if (gallery) {
+      gallery.className = `gallery thumbnail-${e.target.value}`;
+    }
   });
 }
 
@@ -455,7 +484,10 @@ if (viewerModeEl) {
 const slideShowIntervalEl = document.getElementById('slideShowInterval');
 if (slideShowIntervalEl) {
   slideShowIntervalEl.addEventListener('change', async (e) => {
-    const value = parseInt(e.target.value) * 1000;
+    const seconds = parseInt(e.target.value, 10);
+    const currentMs = currentSettings.slideShowInterval;
+    const fallbackMs = Number.isFinite(currentMs) && currentMs > 0 ? currentMs : 5000;
+    const value = Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : fallbackMs;
     await window.api.setSetting('slideShowInterval', value);
     currentSettings.slideShowInterval = value;
   });
