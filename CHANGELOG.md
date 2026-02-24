@@ -1,6 +1,24 @@
 # Changelog
 
-## [Unreleased] - 2026-01-08
+## [Unreleased] - 2026-02-14
+
+### Changed
+- **Updated Electron**: 39.2.7 → 40.4.1 (latest stable version)
+- **Updated electron-builder**: 26.4.0 → 26.7.0 (latest version)
+- **Improved Theme Changer**: Enhanced robustness and error handling
+  - Added fallback settings object to prevent crashes if settings initialization fails
+  - Added error handling in settings initialization to ensure theme is always applied
+  - Added null checks for DOM elements before adding event listeners
+  - Theme is now applied before setting dropdown values to prevent visual glitches
+
+### Fixed
+- Fixed potential crash when settings manager fails to initialize
+- Fixed race condition in theme application on initial load
+- Improved reliability of settings persistence across app restarts
+
+---
+
+## [Previous Release] - 2026-01-08
 
 ### Added
 - **EXIF Metadata Viewer**: Press `I` in image viewer to see comprehensive metadata

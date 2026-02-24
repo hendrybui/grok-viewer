@@ -6,7 +6,7 @@ let slideshowInterval = null;
 let slideshowSpeed = 3000;
 let slideshowPlaying = false;
 let currentSlideshowIndex = 0;
-let selectedFiles = new Set();
+// Note: selectedFiles is declared in renderer.js and shared globally
 let comparisonImages = { A: null, B: null };
 let collections = {};
 let searchQuery = '';
