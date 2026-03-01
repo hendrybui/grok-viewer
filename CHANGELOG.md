@@ -3,7 +3,11 @@
 ## [Unreleased]
 
 ---
+
 ## [Released] - 2026-02-24
+
+### Added
+- **Added Node.js engine requirement**: `>=20.0.0` to `package.json`
 
 ### Changed
 - **Updated Electron**: 39.2.7 → 40.4.1 (latest stable version)
@@ -13,7 +17,6 @@
   - Added error handling in settings initialization to ensure theme is always applied
   - Added null checks for DOM elements before adding event listeners
   - Theme is now applied before setting dropdown values to prevent visual glitches
-- **Added Node.js engine requirement**: `>=20.0.0` to `package.json`
 
 ### Fixed
 - Fixed potential crash when settings manager fails to initialize
