@@ -1,6 +1,13 @@
 # Changelog
 
-## [Unreleased] - 2026-02-14
+## [Unreleased]
+
+---
+
+## [Released] - 2026-02-24
+
+### Added
+- **Added Node.js engine requirement**: `>=20.0.0` to `package.json`
 
 ### Changed
 - **Updated Electron**: 39.2.7 → 40.4.1 (latest stable version)
@@ -15,6 +22,10 @@
 - Fixed potential crash when settings manager fails to initialize
 - Fixed race condition in theme application on initial load
 - Improved reliability of settings persistence across app restarts
+- Fixed duplicate `selectedFiles` declaration in `enhanced-features.js` that caused a syntax error
+- Added complete default settings in fallback objects (`main.js` and `renderer.js`) to match `config/default-settings.json`
+- Fixed `parseInt` call to use explicit radix (`10`) and added validation for `slideShowInterval` values
+- Added null check for `gallery` element in `thumbnailSize` change handler
 
 ---
 
