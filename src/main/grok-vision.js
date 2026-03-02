@@ -20,21 +20,21 @@ class GrokVision {
    */
   async analyzeImage(imagePath) {
     try {
-      // Check cache first
-      const cacheKey = this.getCacheKey(imagePath);
+      // Get file stats once and reuse throughout to avoid duplicate I/O
+      const fileStats = await fs.stat(imagePath);
+      const cacheKey = this.getCacheKey(imagePath, fileStats);
       if (this.cache.has(cacheKey)) {
         return this.cache.get(cacheKey);
       }
 
-      const stats = await fs.stat(imagePath);
       const metadata = await sharp(imagePath).metadata();
       
       // Extract basic information
       const analysis = {
         path: imagePath,
         filename: path.basename(imagePath),
-        size: stats.size,
-        sizeFormatted: this.formatBytes(stats.size),
+        size: fileStats.size,
+        sizeFormatted: this.formatBytes(fileStats.size),
         dimensions: {
           width: metadata.width,
           height: metadata.height,
@@ -46,8 +46,8 @@ class GrokVision {
         orientation: metadata.orientation || 1,
         density: metadata.density || 72,
         
-        // Quality assessment
-        quality: await this.assessQuality(imagePath, metadata),
+        // Quality assessment - pass fileStats to avoid a second fs.stat call
+        quality: await this.assessQuality(imagePath, metadata, fileStats),
         
         // Content analysis
         content: await this.analyzeContent(imagePath, metadata),
@@ -79,7 +79,7 @@ class GrokVision {
    * @param {Object} metadata - Sharp metadata
    * @returns {Promise<Object>} Quality assessment
    */
-  async assessQuality(imagePath, metadata) {
+  async assessQuality(imagePath, metadata, fileStats) {
     try {
       const image = sharp(imagePath);
       const stats = await image.stats();
@@ -90,12 +90,12 @@ class GrokVision {
       // Calculate contrast
       const contrast = this.calculateContrast(stats);
       
-      // Estimate quality score (0-100)
+      // Estimate quality score (0-100); reuse fileStats passed from analyzeImage
       const qualityScore = this.calculateQualityScore({
         brightness,
         contrast,
         resolution: metadata.width * metadata.height,
-        fileSize: (await fs.stat(imagePath)).size
+        fileSize: fileStats.size
       });
 
       return {
@@ -162,21 +162,13 @@ class GrokVision {
    * @returns {Promise<Array<Object>>} Array of analysis results
    */
   async batchAnalyze(imagePaths) {
-    const results = [];
-    
-    for (const imagePath of imagePaths) {
-      try {
-        const analysis = await this.analyzeImage(imagePath);
-        results.push(analysis);
-      } catch (error) {
-        results.push({
-          path: imagePath,
-          error: error.message
-        });
-      }
-    }
-    
-    return results;
+    const settled = await Promise.allSettled(
+      imagePaths.map(imagePath => this.analyzeImage(imagePath))
+    );
+    return settled.map((result, index) => {
+      if (result.status === 'fulfilled') return result.value;
+      return { path: imagePaths[index], error: result.reason.message };
+    });
   }
 
   /**
@@ -254,52 +246,55 @@ class GrokVision {
       colorful: []
     };
 
-    for (const imagePath of imagePaths) {
-      try {
-        const analysis = await this.analyzeImage(imagePath);
-        const { dimensions, quality, content } = analysis;
+    const settled = await Promise.allSettled(
+      imagePaths.map(imagePath => this.analyzeImage(imagePath))
+    );
 
-        // Categorize by orientation
-        if (dimensions.aspectRatio > 1.5) {
-          categories.panoramic.push(imagePath);
-        } else if (dimensions.aspectRatio > 1.2) {
-          categories.landscape.push(imagePath);
-        } else if (dimensions.aspectRatio < 0.8) {
-          categories.portrait.push(imagePath);
-        } else {
-          categories.square.push(imagePath);
-        }
-
-        // Categorize by quality
-        if (quality.score >= 70) {
-          categories.highQuality.push(imagePath);
-        } else if (quality.score < 40) {
-          categories.lowQuality.push(imagePath);
-        }
-
-        // Categorize by brightness
-        if (content.isDark) {
-          categories.dark.push(imagePath);
-        } else if (content.isBright) {
-          categories.bright.push(imagePath);
-        }
-
-        // Categorize by colorfulness
-        if (content.isColorful) {
-          categories.colorful.push(imagePath);
-        }
-      } catch (error) {
-        console.error(`Error categorizing ${imagePath}:`, error);
+    settled.forEach((result, index) => {
+      if (result.status !== 'fulfilled') {
+        console.error(`Error categorizing ${imagePaths[index]}:`, result.reason);
+        return;
       }
-    }
+      const imagePath = imagePaths[index];
+      const { dimensions, quality, content } = result.value;
+
+      // Categorize by orientation
+      if (dimensions.aspectRatio > 1.5) {
+        categories.panoramic.push(imagePath);
+      } else if (dimensions.aspectRatio > 1.2) {
+        categories.landscape.push(imagePath);
+      } else if (dimensions.aspectRatio < 0.8) {
+        categories.portrait.push(imagePath);
+      } else {
+        categories.square.push(imagePath);
+      }
+
+      // Categorize by quality
+      if (quality.score >= 70) {
+        categories.highQuality.push(imagePath);
+      } else if (quality.score < 40) {
+        categories.lowQuality.push(imagePath);
+      }
+
+      // Categorize by brightness
+      if (content.isDark) {
+        categories.dark.push(imagePath);
+      } else if (content.isBright) {
+        categories.bright.push(imagePath);
+      }
+
+      // Categorize by colorfulness
+      if (content.isColorful) {
+        categories.colorful.push(imagePath);
+      }
+    });
 
     return categories;
   }
 
   // Helper methods
 
-  getCacheKey(imagePath) {
-    const stats = require('fs').statSync(imagePath);
+  getCacheKey(imagePath, stats) {
     return `${imagePath}-${stats.mtimeMs}-${stats.size}`;
   }
 
@@ -420,7 +415,6 @@ class GrokVision {
 
   async extractColorPalette(imagePath, count = 5) {
     try {
-      await sharp(imagePath).stats();
       const palette = [];
 
       // Extract colors from different regions

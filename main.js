@@ -78,7 +78,8 @@ async function buildFolderTree(dirPath, imageExtensions, videoExtensions, isRoot
   try {
     const entries = await fs.readdir(dirPath, { withFileTypes: true });
 
-    // Count media files in this directory
+    // Single pass: count media files and collect subdirectory entries
+    const subdirs = [];
     for (const entry of entries) {
       if (entry.isFile()) {
         const ext = path.extname(entry.name).toLowerCase();
@@ -87,19 +88,19 @@ async function buildFolderTree(dirPath, imageExtensions, videoExtensions, isRoot
         } else if (videoExtensions.includes(ext)) {
           folder.videoCount++;
         }
+      } else if (entry.isDirectory()) {
+        subdirs.push(entry);
       }
     }
 
     // Build child folders
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        const childPath = path.join(dirPath, entry.name);
-        const childFolder = await buildFolderTree(childPath, imageExtensions, videoExtensions, false);
-        // Only include folders that have files (directly or in subfolders)
-        const childTotal = childFolder.imageCount + childFolder.videoCount + (childFolder.totalImageCount || 0) + (childFolder.totalVideoCount || 0);
-        if (childTotal > 0) {
-          folder.children.push(childFolder);
-        }
+    for (const entry of subdirs) {
+      const childPath = path.join(dirPath, entry.name);
+      const childFolder = await buildFolderTree(childPath, imageExtensions, videoExtensions, false);
+      // Only include folders that have files (directly or in subfolders)
+      const childTotal = childFolder.imageCount + childFolder.videoCount + (childFolder.totalImageCount || 0) + (childFolder.totalVideoCount || 0);
+      if (childTotal > 0) {
+        folder.children.push(childFolder);
       }
     }
 
@@ -538,6 +539,18 @@ ipcMain.handle('file:flip', async (event, filePath, direction) => {
 // 12. Handle thumbnail generation (for caching)
 ipcMain.handle('file:generateThumbnail', async (event, filePath, size = 300) => {
   try {
+    const cacheDir = path.join(app.getPath('userData'), 'thumbnails');
+    const hash = require('crypto').createHash('md5').update(filePath).digest('hex');
+    const cachePath = path.join(cacheDir, `${hash}.jpg`);
+
+    // Return cached thumbnail if it already exists
+    try {
+      await fs.access(cachePath);
+      return { success: true, cachePath };
+    } catch {
+      // Cache miss — generate the thumbnail below
+    }
+
     const sharp = require('sharp');
     const buffer = await fs.readFile(filePath);
     const thumbnail = await sharp(buffer)
@@ -549,12 +562,7 @@ ipcMain.handle('file:generateThumbnail', async (event, filePath, size = 300) => 
       .toBuffer();
     
     // Store in cache directory
-    const cacheDir = path.join(app.getPath('userData'), 'thumbnails');
     await fs.mkdir(cacheDir, { recursive: true });
-    
-    const hash = require('crypto').createHash('md5').update(filePath).digest('hex');
-    const cachePath = path.join(cacheDir, `${hash}.jpg`);
-    
     await fs.writeFile(cachePath, thumbnail);
     return { success: true, cachePath };
   } catch (err) {
@@ -565,30 +573,32 @@ ipcMain.handle('file:generateThumbnail', async (event, filePath, size = 300) => 
 
 // 13. Handle batch file operations
 ipcMain.handle('files:batchMove', async (event, files, targetDir) => {
-  const results = [];
-  for (const file of files) {
-    try {
-      const fileName = path.basename(file);
-      const targetPath = path.join(targetDir, fileName);
-      await fs.rename(file, targetPath);
-      results.push({ file, success: true });
-    } catch (err) {
-      results.push({ file, success: false, error: err.message });
-    }
-  }
+  const results = await Promise.all(
+    files.map(async (file) => {
+      try {
+        const fileName = path.basename(file);
+        const targetPath = path.join(targetDir, fileName);
+        await fs.rename(file, targetPath);
+        return { file, success: true };
+      } catch (err) {
+        return { file, success: false, error: err.message };
+      }
+    })
+  );
   return results;
 });
 
 ipcMain.handle('files:batchDelete', async (event, files) => {
-  const results = [];
-  for (const file of files) {
-    try {
-      await fs.unlink(file);
-      results.push({ file, success: true });
-    } catch (err) {
-      results.push({ file, success: false, error: err.message });
-    }
-  }
+  const results = await Promise.all(
+    files.map(async (file) => {
+      try {
+        await fs.unlink(file);
+        return { file, success: true };
+      } catch (err) {
+        return { file, success: false, error: err.message };
+      }
+    })
+  );
   return results;
 });
 
