@@ -1,0 +1,44 @@
+name: Prevent AppImage code in main
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check-appimage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for AppImage configuration in package.json
+        run: |
+          FAILED=0
+
+          # Check for a build:appimage script
+          if jq -e '.scripts["build:appimage"]' package.json > /dev/null 2>&1; then
+            echo "ERROR: 'build:appimage' script found in package.json scripts."
+            FAILED=1
+          fi
+
+          # Check for a linux build target section
+          if jq -e '.build.linux' package.json > /dev/null 2>&1; then
+            echo "ERROR: Linux build target found in package.json build configuration."
+            FAILED=1
+          fi
+
+          # Check for AppImage as a build target anywhere in the build config
+          if jq -e '[.. | strings | select(ascii_downcase == "appimage")] | length > 0' package.json > /dev/null 2>&1; then
+            echo "ERROR: AppImage build target found in package.json build configuration."
+            FAILED=1
+          fi
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo "AppImage build configuration must not be merged into main."
+            exit 1
+          fi
+
+          echo "OK: No AppImage configuration found in package.json."
