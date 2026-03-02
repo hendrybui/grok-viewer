@@ -8,6 +8,27 @@ let currentFolderPath = null;
 let folderTreeData = null;
 let selectedFiles = new Set(); // Track selected files for multi-select
 
+// Shared IntersectionObserver for gallery video autoplay — one instance for all videos
+const videoAutoplayObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    const media = entry.target;
+    if (entry.isIntersecting) {
+      media.play().catch((e) => {
+        console.log('Autoplay prevented:', e);
+        if (!media.parentElement?.querySelector('.play-overlay')) {
+          const overlay = document.createElement('div');
+          overlay.className = 'play-overlay';
+          overlay.innerHTML = '▶';
+          overlay.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); color: white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 18px; pointer-events: none; z-index: 1;';
+          media.parentElement.appendChild(overlay);
+        }
+      });
+    } else {
+      media.pause();
+    }
+  });
+}, { threshold: 0.5 });
+
 // DOM Elements
 const pickFolderBtn = document.getElementById('pickFolder');
 const sidebar = document.getElementById('sidebar');
@@ -821,28 +842,8 @@ function renderGallery(files) {
       
       // Load video metadata first
       media.addEventListener('loadedmetadata', () => {
-        // Use Intersection Observer for auto-play when visible
-        const observer = new IntersectionObserver((entries) => {
-          entries.forEach(entry => {
-            if (entry.isIntersecting) {
-              media.play().catch(e => {
-                console.log('Autoplay prevented:', file, e);
-                // Show play overlay on autoplay failure
-                if (!media.parentElement.querySelector('.play-overlay')) {
-                  const overlay = document.createElement('div');
-                  overlay.className = 'play-overlay';
-                  overlay.innerHTML = '▶';
-                  overlay.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); color: white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 18px; pointer-events: none; z-index: 1;';
-                  media.parentElement.appendChild(overlay);
-                }
-              });
-            } else {
-              media.pause();
-            }
-          });
-        }, { threshold: 0.5 });
-        
-        observer.observe(media);
+        // Use the shared IntersectionObserver for autoplay when visible
+        videoAutoplayObserver.observe(media);
       });
       
       // Also play on hover for immediate interaction

@@ -30,10 +30,12 @@ function setupSearch() {
   
   if (!searchInput) return;
   
+  const debouncedFilter = debounce(() => filterGalleryBySearch(), 150);
+
   searchInput.addEventListener('input', (e) => {
     searchQuery = e.target.value.toLowerCase();
     clearSearchBtn.style.display = searchQuery ? 'block' : 'none';
-    filterGalleryBySearch();
+    debouncedFilter();
   });
   
   clearSearchBtn.addEventListener('click', () => {
